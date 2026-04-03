@@ -1,0 +1,15 @@
+F1 Qualifying Predictor
+
+F1 Qualifying PredictorPredict Formula 1 qualifying lap times using machine learning trained on 2019–2024 FastF1 data.
+Features
+
+Qualifying Prediction — Select any team, driver and circuit to get a predicted lap time and grid position
+Team Intelligence — Historical performance trends by year, circuit type, and speed class
+R&D Setup Simulator — Simulate high vs low downforce configurations across all circuits
+
+Model Details
+
+Algorithm: XGBoost Regressor
+Features: 27 features covering driver/team identity, circuit DNA, weather, tyre setup, speed traps
+Train/Test split: Time-based (train ≤2023, test 2024)
+Target: Qualifying lap time in seconds
