@@ -1,9 +1,3 @@
-"""
-F1 Qualifying Time Predictor — Model Training Script
-Run this ONCE locally to train and save the model.
-Usage: python train_model.py
-"""
-
 import pandas as pd
 import numpy as np
 import joblib
