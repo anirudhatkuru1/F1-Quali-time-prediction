@@ -1,14 +1,15 @@
 """
-F1 Qualifying Predictor — Streamlit Dashboard (2025 Season)
-Run with: python -m streamlit run app.py
+F1 Qualifying Predictor — 2025 Season
+Single-team perspective dashboard.
+Run: python -m streamlit run app.py
 """
 
 import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import plotly.express as px
 import plotly.graph_objects as go
+import plotly.express as px
 import os
 
 # ─────────────────────────────────────────────
@@ -26,20 +27,26 @@ st.markdown("""
   @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap');
   html, body, [class*="css"] { font-family: 'Titillium Web', sans-serif; }
   .stApp { background-color: #0f0f0f; }
-  h1 { color: #ffffff !important; font-weight: 900 !important; letter-spacing: 2px; }
+  h1  { color: #ffffff !important; font-weight: 900 !important; letter-spacing: 2px; }
   h2, h3 { color: #cccccc !important; }
   .section-header {
     border-left: 4px solid #e10600; padding-left: 12px;
     margin: 20px 0 14px 0; color: #ffffff;
     font-size: 18px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
   }
-  .rookie-badge {
-    background: #2a1500; border: 1px solid #ff8c00; border-radius: 4px;
-    color: #ff8c00; font-size: 11px; padding: 2px 7px; margin-left: 6px;
-  }
-  div[data-testid="stMetricValue"] { color: #e10600 !important; font-size: 26px !important; }
+  div[data-testid="stMetricValue"] { color: #e10600 !important; font-size: 24px !important; }
   div[data-testid="stMetricLabel"] { color: #aaaaaa !important; }
-  .stSelectbox label, .stSlider label { color: #aaaaaa !important; }
+  .driver-card {
+    background: #1a1a2e; border: 1px solid #333; border-radius: 8px;
+    padding: 16px; text-align: center; margin-bottom: 8px;
+  }
+  .driver-name { font-size: 28px; font-weight: 900; color: #ffffff; letter-spacing: 3px; }
+  .driver-team { font-size: 13px; color: #888; letter-spacing: 1px; }
+  .faster-tag  { color: #4CAF50; font-size: 13px; font-weight: 700; }
+  .slower-tag  { color: #e10600; font-size: 13px; font-weight: 700; }
+  .rookie-note { color: #ff8c00; font-size: 11px; }
+  .wx-note { background:#1a1a2e; border:1px solid #333; border-radius:5px;
+             padding:8px 12px; color:#888; font-size:12px; margin-top:4px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -47,34 +54,30 @@ st.markdown("""
 # LOAD ARTIFACTS
 # ─────────────────────────────────────────────
 @st.cache_resource
-def load_model():
-    model            = joblib.load("model/xgb_model.pkl")
-    le_team          = joblib.load("model/le_team.pkl")
-    le_driver        = joblib.load("model/le_driver.pkl")
-    le_event         = joblib.load("model/le_event.pkl")
-    features         = joblib.load("model/features.pkl")
-    team_circuit_avg = joblib.load("model/team_circuit_avg.pkl")
-    driver_skill     = joblib.load("model/driver_skill.pkl")
-    team_avg_delta   = joblib.load("model/team_avg_delta.pkl")
-    f1_2025_grid     = joblib.load("model/f1_2025_grid.pkl")
-    rookies_2025     = joblib.load("model/rookies_2025.pkl")
-    metrics          = joblib.load("model/metrics.pkl")
-    return (model, le_team, le_driver, le_event, features,
-            team_circuit_avg, driver_skill, team_avg_delta,
-            f1_2025_grid, rookies_2025, metrics)
+def load_model_artifacts():
+    return (
+        joblib.load("model/xgb_model.pkl"),
+        joblib.load("model/le_team.pkl"),
+        joblib.load("model/le_driver.pkl"),
+        joblib.load("model/le_event.pkl"),
+        joblib.load("model/features.pkl"),
+        joblib.load("model/team_circuit_avg_delta.pkl"),
+        joblib.load("model/team_circuit_avg_abs.pkl"),
+        joblib.load("model/driver_skill.pkl"),
+        joblib.load("model/team_avg_delta.pkl"),
+        joblib.load("model/weather_defaults.pkl"),
+        joblib.load("model/f1_2025_grid.pkl"),
+        joblib.load("model/rookies_2025.pkl"),
+        joblib.load("model/metrics.pkl"),
+    )
 
 @st.cache_data
 def load_data():
-    df        = pd.read_csv("data/data.csv")
-    tracks    = pd.read_csv("data/tracks.csv")
-    real_2025 = pd.read_csv("data/real_lap_time_2025.csv")
-    return df, tracks, real_2025
-
-def secs_to_str(s):
-    if pd.isna(s) or s <= 0:
-        return "N/A"
-    m = int(s // 60)
-    return f"{m}:{s % 60:06.3f}"
+    return (
+        pd.read_csv("data/data.csv"),
+        pd.read_csv("data/tracks.csv"),
+        pd.read_csv("data/real_lap_time_2025.csv"),
+    )
 
 # ─────────────────────────────────────────────
 # MODEL CHECK
@@ -86,583 +89,743 @@ if not os.path.exists("model/xgb_model.pkl"):
     st.stop()
 
 (model, le_team, le_driver, le_event, features,
- team_circuit_avg, driver_skill, team_avg_delta,
- F1_2025_GRID, ROOKIES_2025, metrics) = load_model()
+ team_circuit_avg_delta, team_circuit_avg_abs, driver_skill,
+ team_avg_delta, weather_defaults, F1_2025_GRID, ROOKIES_2025, metrics) = load_model_artifacts()
 
 df, tracks, real_2025 = load_data()
 
-# Convenience lookups
-TEAMS_2025   = list(F1_2025_GRID.keys())
-ALL_EVENTS   = sorted(real_2025["race"].unique())  # use 2025 calendar
-
-# Driver → team map for 2025
-DRIVER_TEAM_2025 = {d: t for t, drivers in F1_2025_GRID.items() for d in drivers}
+TEAMS_2025       = list(F1_2025_GRID.keys())
+ALL_EVENTS       = sorted(real_2025["race"].unique())
+DRIVER_TEAM_2025 = {d: t for t, drvs in F1_2025_GRID.items() for d in drvs}
 
 # ─────────────────────────────────────────────
-# HELPER: BUILD PREDICTION INPUT ROW
+# HELPERS
 # ─────────────────────────────────────────────
-def build_input(event, team, driver, segment="Q3", compound="SOFT",
-                tyre_life=2, fresh=True, air_t=25, track_t=38,
-                hum=50, wind=3.0, rain=False, year=2025):
+def secs_to_str(s):
+    if pd.isna(s) or s <= 0: return "N/A"
+    m = int(s // 60)
+    return f"{m}:{s % 60:06.3f}"
 
-    segment_map  = {"Q1": 1, "Q2": 2, "Q3": 3}
-    compound_map = {"SOFT": 3, "MEDIUM": 2, "HARD": 1, "INTER": 0, "WET": -1}
-    speed_map    = {"Slow": 1, "Medium": 2, "Fast": 3}
+def get_wx(event):
+    row = weather_defaults[weather_defaults["Event"] == event]
+    if row.empty:
+        return dict(AirTemp=25.0, TrackTemp=38.0, Humidity=50.0,
+                    WindSpeed=2.0, Pressure=1013.0, Rainfall=0.0)
+    r = row.iloc[0]
+    return dict(AirTemp=r.AirTemp, TrackTemp=r.TrackTemp, Humidity=r.Humidity,
+                WindSpeed=r.WindSpeed, Pressure=r.Pressure, Rainfall=r.Rainfall)
+
+def safe_enc(le, val):
+    return int(le.transform([val])[0]) if val in le.classes_ else 0
+
+TRAP_MAP  = {"Slow":(240,220,210,250),"Medium":(270,255,245,285),"Fast":(300,285,275,315)}
+SPEED_MAP = {"Slow":1,"Medium":2,"Fast":3}
+
+def predict_delta(event, team, driver, segment="Q3", compound="SOFT",
+                  tyre_life=2, fresh=True, wx=None):
+    """Returns predicted DELTA FROM POLE (seconds)."""
+    if wx is None:
+        wx = get_wx(event)
 
     ti = tracks[tracks["Event"] == event]
     if ti.empty:
-        ti_vals = dict(TrackType="Permanent", LapSpeedClass="Medium", DRSZones=2,
-                       Altitude_m=50, NumCorners=15, CornerDensity=0.003,
-                       TrackLength_m=5000, AvgCornerSpacing_m=333)
+        ti_v = dict(TrackType="Permanent", LapSpeedClass="Medium", DRSZones=2,
+                    Altitude_m=50, NumCorners=15, CornerDensity=0.003,
+                    TrackLength_m=5000, AvgCornerSpacing_m=333)
     else:
-        ti_vals = ti.iloc[0].to_dict()
+        ti_v = ti.iloc[0].to_dict()
 
-    is_street  = 1 if ti_vals["TrackType"] == "Street" else 0
-    speed_cls  = speed_map.get(str(ti_vals["LapSpeedClass"]), 2)
-    track_type = ti_vals["TrackType"]
+    track_type = str(ti_v.get("TrackType","Permanent"))
+    sc         = str(ti_v.get("LapSpeedClass","Medium"))
+    si1,si2,sfl,sst = TRAP_MAP.get(sc,(265,250,240,278))
 
-    # TeamCircuitAvg
-    tca = team_circuit_avg[
-        (team_circuit_avg["Team"] == team) &
-        (team_circuit_avg["TrackType"] == track_type)
+    tca = team_circuit_avg_delta[
+        (team_circuit_avg_delta["Team"] == team) &
+        (team_circuit_avg_delta["TrackType"] == track_type)
     ]
-    tc_avg = tca["TeamCircuitAvg"].values[0] if not tca.empty else df["LapTime_sec"].mean()
+    tc_avg_delta = tca["TeamCircuitAvgDelta"].values[0] if not tca.empty else 1.0
 
-    # DriverAvgDelta (rookies already in driver_skill from train_model)
-    ds = driver_skill[driver_skill["Driver"] == driver]
+    ds  = driver_skill[driver_skill["Driver"] == driver]
     if ds.empty:
-        # Fallback: use team avg delta
-        td = team_avg_delta[team_avg_delta["Team"] == team]
+        td  = team_avg_delta[team_avg_delta["Team"] == team]
         drv_delta = td["TeamAvgDelta"].values[0] if not td.empty else 1.5
     else:
         drv_delta = ds["DriverAvgDelta"].values[0]
 
-    # Safe label encoding
-    def enc(le, val):
-        return le.transform([val])[0] if val in le.classes_ else 0
-
-    # Speed trap defaults by circuit speed class
-    trap_map = {"Slow": (240, 220, 210, 250), "Medium": (270, 255, 245, 285), "Fast": (300, 285, 275, 315)}
-    si1, si2, sfl, sst = trap_map.get(str(ti_vals["LapSpeedClass"]), (265, 250, 240, 278))
+    seg_map  = {"Q1":1,"Q2":2,"Q3":3}
+    cmp_map  = {"SOFT":3,"MEDIUM":2,"HARD":1,"INTER":0,"WET":-1}
 
     row = {
-        "Team_enc":           enc(le_team,   team),
-        "Driver_enc":         enc(le_driver, driver),
-        "Event_enc":          enc(le_event,  event),
-        "Year":               year,
-        "QualiSegment_num":   segment_map.get(segment, 2),
-        "Compound_num":       compound_map.get(compound, 3),
+        "Team_enc":           safe_enc(le_team,   team),
+        "Driver_enc":         safe_enc(le_driver, driver),
+        "Event_enc":          safe_enc(le_event,  event),
+        "Year":               2025,
+        "QualiSegment_num":   seg_map.get(segment, 2),
+        "Compound_num":       cmp_map.get(compound, 3),
         "TyreLife":           tyre_life,
         "FreshTyre_int":      int(fresh),
-        "IsStreet":           is_street,
-        "SpeedClass_num":     speed_cls,
-        "DRSZones":           ti_vals["DRSZones"],
-        "Altitude_m":         ti_vals["Altitude_m"],
-        "NumCorners":         ti_vals["NumCorners"],
-        "CornerDensity":      ti_vals["CornerDensity"],
-        "TrackLength_m":      ti_vals["TrackLength_m"],
-        "AvgCornerSpacing_m": ti_vals["AvgCornerSpacing_m"],
-        "AirTemp":            air_t,
-        "TrackTemp":          track_t,
-        "Humidity":           hum,
-        "Pressure":           1013.0,
-        "WindSpeed":          wind,
-        "Rainfall_int":       int(rain),
-        "SpeedI1":            si1,
-        "SpeedI2":            si2,
-        "SpeedFL":            sfl,
-        "SpeedST":            sst,
-        "TeamCircuitAvg":     tc_avg,
-        "DriverAvgDelta":     drv_delta,
+        "IsStreet":           1 if track_type == "Street" else 0,
+        "SpeedClass_num":     SPEED_MAP.get(sc, 2),
+        "DRSZones":           ti_v.get("DRSZones",2),
+        "Altitude_m":         ti_v.get("Altitude_m",50),
+        "NumCorners":         ti_v.get("NumCorners",15),
+        "CornerDensity":      ti_v.get("CornerDensity",0.003),
+        "TrackLength_m":      ti_v.get("TrackLength_m",5000),
+        "AvgCornerSpacing_m": ti_v.get("AvgCornerSpacing_m",333),
+        "AirTemp":            wx["AirTemp"],
+        "TrackTemp":          wx["TrackTemp"],
+        "Humidity":           wx["Humidity"],
+        "Pressure":           wx["Pressure"],
+        "WindSpeed":          wx["WindSpeed"],
+        "Rainfall_int":       1 if wx["Rainfall"] > 0.1 else 0,
+        "SpeedI1":            si1, "SpeedI2": si2,
+        "SpeedFL":            sfl, "SpeedST": sst,
+        "TeamCircuitAvgDelta": tc_avg_delta,
+        "DriverAvgDelta":      drv_delta,
     }
-    return pd.DataFrame([row])[features]
+    delta = float(model.predict(pd.DataFrame([row])[features])[0])
+    return max(0.0, delta)   # delta can't be negative
+
+def get_pole_2025(event):
+    """Return real 2025 pole time for a circuit, or None."""
+    row = real_2025[real_2025["race"] == event]
+    if row.empty: return None
+    return float(row["real_time_seconds"].min())
+
+def predict_absolute(event, team, driver, segment="Q3", compound="SOFT",
+                     tyre_life=2, fresh=True, wx=None):
+    """Delta + real 2025 pole = best possible absolute prediction."""
+    delta = predict_delta(event, team, driver, segment, compound, tyre_life, fresh, wx)
+    pole  = get_pole_2025(event)
+    if pole is None:
+        # Fallback: use historical pole + delta
+        push = df[df["IsPushLap"]==1]
+        best_hist = push.groupby("Event")["LapTime_sec"].min()
+        pole = best_hist.get(event, 90.0)
+    return pole + delta, delta, pole
 
 # ─────────────────────────────────────────────
-# SIDEBAR
+# SIDEBAR — TEAM SELECTION (single entry point)
 # ─────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 🏎️ F1 QUALI PREDICTOR")
-    st.markdown("*2025 Season*")
+    st.markdown("*2025 Season — Team View*")
     st.markdown("---")
 
-    st.markdown("### 🎯 Team & Driver")
-    sel_team   = st.selectbox("Team", TEAMS_2025)
-    team_drvs  = F1_2025_GRID[sel_team]
-    sel_driver = st.selectbox(
-        "Driver",
-        team_drvs,
-        format_func=lambda d: f"{d} 🆕" if d in ROOKIES_2025 else d
-    )
-    if sel_driver in ROOKIES_2025:
-        st.caption("🆕 Rookie — prediction based on team historical average")
+    st.markdown("### 🏎️ Select Your Team")
+    sel_team = st.selectbox("Team", TEAMS_2025, label_visibility="collapsed")
+    drv1, drv2 = F1_2025_GRID[sel_team]
+
+    # Show both drivers
+    st.markdown(f"""
+    <div style='background:#1a1a2e;border:1px solid #333;border-radius:6px;padding:12px;margin:8px 0'>
+      <div style='color:#888;font-size:11px;letter-spacing:1px'>2025 DRIVERS</div>
+      <div style='color:#e10600;font-size:22px;font-weight:900;margin-top:6px'>{drv1}</div>
+      <div style='color:#0066cc;font-size:22px;font-weight:900'>{drv2}{"  🆕" if drv2 in ROOKIES_2025 else ""}</div>
+    </div>
+    """, unsafe_allow_html=True)
+    if drv1 in ROOKIES_2025: st.caption(f"🆕 {drv1}: rookie — estimate from team avg")
+    if drv2 in ROOKIES_2025: st.caption(f"🆕 {drv2}: rookie — estimate from team avg")
 
     st.markdown("---")
     st.markdown("### 🏁 Circuit")
     sel_event = st.selectbox("Grand Prix", ALL_EVENTS)
 
-    ti_sidebar = tracks[tracks["Event"] == sel_event]
-    if not ti_sidebar.empty:
-        t = ti_sidebar.iloc[0]
+    ti_s = tracks[tracks["Event"] == sel_event]
+    if not ti_s.empty:
+        t = ti_s.iloc[0]
         st.markdown(f"""
-        <div style='background:#1a1a2e;border:1px solid #333;border-radius:6px;padding:12px;margin-top:6px'>
-          <div style='color:#888;font-size:11px;letter-spacing:1px'>CIRCUIT INFO</div>
-          <div style='color:#fff;margin-top:6px'>🏟️ {t['TrackType']} · {t['LapSpeedClass']}</div>
-          <div style='color:#aaa;font-size:13px'>📏 {t['TrackLength_m']/1000:.3f} km · {int(t['NumCorners'])} corners</div>
-          <div style='color:#aaa;font-size:13px'>🔵 {int(t['DRSZones'])} DRS zones · 📍 {int(t['Altitude_m'])}m alt</div>
+        <div style='background:#1a1a2e;border:1px solid #333;border-radius:6px;padding:10px;margin-top:6px'>
+          <div style='color:#888;font-size:11px;letter-spacing:1px'>CIRCUIT</div>
+          <div style='color:#fff;margin-top:4px'>🏟️ {t['TrackType']} · {t['LapSpeedClass']}</div>
+          <div style='color:#aaa;font-size:12px'>📏 {t['TrackLength_m']/1000:.3f} km · {int(t['NumCorners'])} corners</div>
+          <div style='color:#aaa;font-size:12px'>🔵 {int(t['DRSZones'])} DRS zones · 📍 {int(t['Altitude_m'])}m</div>
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown("### ⚙️ Session Setup")
-    quali_seg = st.selectbox("Quali Segment", ["Q3", "Q2", "Q1"])
-    compound  = st.selectbox("Tyre Compound", ["SOFT", "MEDIUM", "HARD"])
+    quali_seg = st.selectbox("Quali Segment", ["Q3","Q2","Q1"])
+    compound  = st.selectbox("Tyre Compound", ["SOFT","MEDIUM","HARD"])
     tyre_life = st.slider("Tyre Age (laps)", 1, 10, 2)
     fresh     = st.checkbox("Fresh Tyre", value=True)
 
     st.markdown("---")
     st.markdown("### 🌤️ Weather")
-    air_temp   = st.slider("Air Temp (°C)", 10, 45, 25)
-    track_temp = st.slider("Track Temp (°C)", 15, 60, 38)
-    humidity   = st.slider("Humidity (%)", 10, 100, 50)
-    wind_speed = st.slider("Wind Speed (m/s)", 0.0, 15.0, 3.0)
-    rainfall   = st.checkbox("Rainfall", value=False)
+    hist_wx     = get_wx(sel_event)
+    use_hist_wx = st.checkbox("Use historical circuit weather", value=True)
+    if use_hist_wx:
+        wx = hist_wx
+        st.markdown(f"""<div class='wx-note'>
+          Historical avg · {sel_event}<br>
+          🌡️ Air {hist_wx['AirTemp']:.1f}°C · Track {hist_wx['TrackTemp']:.1f}°C<br>
+          💧 {hist_wx['Humidity']:.0f}% humidity · 💨 {hist_wx['WindSpeed']:.1f} m/s
+        </div>""", unsafe_allow_html=True)
+    else:
+        air_t   = st.slider("Air Temp (°C)",   10, 45,  int(hist_wx["AirTemp"]))
+        track_t = st.slider("Track Temp (°C)", 15, 60,  int(hist_wx["TrackTemp"]))
+        hum     = st.slider("Humidity (%)",    10, 100, int(hist_wx["Humidity"]))
+        wind    = st.slider("Wind (m/s)",      0.0, 15.0, float(round(hist_wx["WindSpeed"],1)))
+        rain    = st.checkbox("Rainfall", value=hist_wx["Rainfall"] > 0.1)
+        wx = dict(AirTemp=air_t, TrackTemp=track_t, Humidity=hum,
+                  WindSpeed=wind, Pressure=hist_wx["Pressure"],
+                  Rainfall=1.0 if rain else 0.0)
 
     st.markdown("---")
-    st.markdown(f"**Model MAE:** `{metrics['mae']}s` · **R²:** `{metrics['r2']}`")
+    st.markdown(f"**MAE (2024 holdout):** `{metrics['mae']}s`")
+    st.markdown(f"**R²:** `{metrics['r2']}`")
+    st.caption("Model predicts gap-to-pole; adds real 2025 pole for absolute time.")
 
 # ─────────────────────────────────────────────
 # HEADER
 # ─────────────────────────────────────────────
-st.markdown("# 🏎️ F1 QUALIFYING PREDICTOR — 2025 SEASON")
-st.markdown(f"*{sel_driver} · {sel_team} · {sel_event}*")
+st.markdown(f"# 🏎️ {sel_team.upper()} — 2025 QUALIFYING ANALYSIS")
+pole_2025 = get_pole_2025(sel_event)
+if pole_2025:
+    st.markdown(f"*{sel_event} · 2025 pole: **{secs_to_str(pole_2025)}***")
+else:
+    st.markdown(f"*{sel_event}*")
 st.markdown("---")
 
 # ─────────────────────────────────────────────
 # TABS
 # ─────────────────────────────────────────────
 tab1, tab2, tab3, tab4 = st.tabs([
-    "🔮 Prediction",
-    "📊 Team Intelligence",
+    "🔮 Race Prediction",
+    "📊 Season Analysis",
     "🛠️ R&D Simulator",
     "✅ 2025 Accuracy",
 ])
 
 # ════════════════════════════════════════════
-# TAB 1 — PREDICTION
+# TAB 1 — RACE PREDICTION (two-driver view)
 # ════════════════════════════════════════════
 with tab1:
-    st.markdown('<div class="section-header">Qualifying Lap Time Prediction</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Predicted Qualifying — Side by Side</div>', unsafe_allow_html=True)
 
-    # Selected driver prediction
-    inp = build_input(sel_event, sel_team, sel_driver, quali_seg, compound,
-                      tyre_life, fresh, air_temp, track_temp, humidity, wind_speed, rainfall)
-    pred_time = model.predict(inp)[0]
+    # Predict both team drivers
+    abs1, delta1, pole1 = predict_absolute(sel_event, sel_team, drv1, quali_seg, compound, tyre_life, fresh, wx)
+    abs2, delta2, pole2 = predict_absolute(sel_event, sel_team, drv2, quali_seg, compound, tyre_life, fresh, wx)
 
-    # Full 2025 grid predictions (Q3, SOFT, default weather) for comparison
+    # Predict full field for grid position
     @st.cache_data
-    def predict_full_grid(event, air_t, track_t, hum, wind, rain):
+    def full_grid(event, _wx_key):
         rows = []
-        for team, drivers in F1_2025_GRID.items():
-            for drv in drivers:
-                row = build_input(event, team, drv, "Q3", "SOFT", 2, True,
-                                  air_t, track_t, hum, wind, rain)
-                p = model.predict(row)[0]
-                rows.append({"Team": team, "Driver": drv, "PredTime": p,
-                              "IsRookie": drv in ROOKIES_2025})
-        gdf = pd.DataFrame(rows).sort_values("PredTime").reset_index(drop=True)
-        gdf["Position"] = range(1, len(gdf) + 1)
-        gdf["Gap"]      = gdf["PredTime"] - gdf["PredTime"].min()
-        gdf["TimeStr"]  = gdf["PredTime"].apply(secs_to_str)
-        gdf["GapStr"]   = gdf["Gap"].apply(lambda x: "POLE" if x < 0.001 else f"+{x:.3f}s")
+        for team, drvs in F1_2025_GRID.items():
+            w = get_wx(event)
+            for d in drvs:
+                dlt  = predict_delta(event, team, d, "Q3","SOFT",2,True,w)
+                pole = get_pole_2025(event)
+                if pole is None:
+                    pole = df[df["IsPushLap"]==1].groupby("Event")["LapTime_sec"].min().get(event,90)
+                rows.append({"Team":team,"Driver":d,
+                             "Delta":dlt,"AbsTime":pole+dlt,
+                             "IsRookie":d in ROOKIES_2025})
+        gdf = pd.DataFrame(rows).sort_values("Delta").reset_index(drop=True)
+        gdf["Position"] = range(1, len(gdf)+1)
+        gdf["TimeStr"]  = gdf["AbsTime"].apply(secs_to_str)
+        gdf["GapStr"]   = gdf["Delta"].apply(lambda x: "POLE" if x<0.001 else f"+{x:.3f}s")
         return gdf
 
-    grid_df = predict_full_grid(sel_event, air_temp, track_temp, humidity, wind_speed, rainfall)
+    grid_df = full_grid(sel_event, str(sel_event))
 
-    our_row = grid_df[(grid_df["Driver"] == sel_driver) & (grid_df["Team"] == sel_team)]
-    our_pos = our_row["Position"].values[0] if not our_row.empty else "?"
-    our_gap = our_row["Gap"].values[0] if not our_row.empty else 0.0
-    pole    = grid_df["PredTime"].min()
+    pos1 = grid_df[(grid_df["Driver"]==drv1)&(grid_df["Team"]==sel_team)]["Position"].values
+    pos2 = grid_df[(grid_df["Driver"]==drv2)&(grid_df["Team"]==sel_team)]["Position"].values
+    pos1 = pos1[0] if len(pos1) else "?"
+    pos2 = pos2[0] if len(pos2) else "?"
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Predicted Lap Time", secs_to_str(pred_time))
-    c2.metric("Predicted Grid Position", f"P{our_pos}")
-    c3.metric("Gap to Pole", f"+{pred_time - pole:.3f}s")
-    ti_info = tracks[tracks["Event"] == sel_event]
-    c4.metric("Circuit Type", ti_info["TrackType"].values[0] if not ti_info.empty else "—")
+    # ── Driver cards ──────────────────────────────────────────────
+    c1, mid, c2 = st.columns([5, 1, 5])
+
+    with c1:
+        faster_tag1 = "⚡ FASTER" if abs1 < abs2 else ""
+        st.markdown(f"""
+        <div class='driver-card' style='border-color:#e10600'>
+          <div class='driver-name' style='color:#e10600'>{drv1}</div>
+          <div class='driver-team'>{sel_team}</div>
+          {"<div class='rookie-note'>🆕 Rookie</div>" if drv1 in ROOKIES_2025 else ""}
+        </div>
+        """, unsafe_allow_html=True)
+        m1a, m1b, m1c = st.columns(3)
+        m1a.metric("Predicted Time", secs_to_str(abs1))
+        m1b.metric("Gap to Pole",    f"+{delta1:.3f}s")
+        m1c.metric("Grid Position",  f"P{pos1}")
+
+    with mid:
+        st.markdown("<div style='text-align:center;color:#555;font-size:24px;margin-top:40px'>VS</div>",
+                    unsafe_allow_html=True)
+
+    with c2:
+        faster_tag2 = "⚡ FASTER" if abs2 < abs1 else ""
+        st.markdown(f"""
+        <div class='driver-card' style='border-color:#0066cc'>
+          <div class='driver-name' style='color:#0066cc'>{drv2}</div>
+          <div class='driver-team'>{sel_team}</div>
+          {"<div class='rookie-note'>🆕 Rookie</div>" if drv2 in ROOKIES_2025 else ""}
+        </div>
+        """, unsafe_allow_html=True)
+        m2a, m2b, m2c = st.columns(3)
+        m2a.metric("Predicted Time", secs_to_str(abs2))
+        m2b.metric("Gap to Pole",    f"+{delta2:.3f}s")
+        m2c.metric("Grid Position",  f"P{pos2}")
+
+    # Intra-team gap
+    gap_between = abs(abs1 - abs2)
+    faster_drv  = drv1 if abs1 < abs2 else drv2
+    st.markdown(f"""
+    <div style='text-align:center;background:#1a1a2e;border:1px solid #333;border-radius:6px;
+                padding:10px;margin:12px 0;color:#fff'>
+      Intra-team gap: <b>{gap_between:.3f}s</b> · <span style='color:#4CAF50'>{faster_drv} predicted faster</span>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
+
+    # ── Full grid ────────────────────────────────────────────────
     col_l, col_r = st.columns(2)
 
     with col_l:
-        st.markdown("**📋 Predicted Starting Grid (Q3 · SOFT)**")
-        disp = grid_df[["Position", "Driver", "Team", "TimeStr", "GapStr", "IsRookie"]].copy()
-        disp.columns = ["Pos", "Driver", "Team", "Lap Time", "Gap", "Rookie"]
-        disp["Driver"] = disp.apply(
-            lambda r: f"{r['Driver']} 🆕" if r["Rookie"] else r["Driver"], axis=1
-        )
-        disp = disp.drop(columns="Rookie")
+        st.markdown("**📋 Full 2025 Grid — Predicted Q3**")
+        disp = grid_df[["Position","Driver","Team","TimeStr","GapStr","IsRookie"]].copy()
+        disp["Driver"] = disp.apply(lambda r: f"{r['Driver']} 🆕" if r["IsRookie"] else r["Driver"], axis=1)
+        disp = disp.drop(columns="IsRookie")
+        disp.columns = ["Pos","Driver","Team","Lap Time","Gap"]
 
-        def hl(row):
-            if sel_driver in row["Driver"] and row["Team"] == sel_team:
-                return ["background-color:#3d0000;color:#ff8888"] * len(row)
+        def hl_grid(row):
+            if row["Team"] == sel_team:
+                c = "#3d0000" if "e10600" else "#001a3d"
+                if drv1 in row["Driver"]:
+                    return [f"background-color:#3d0000;color:#ff8888"] * len(row)
+                elif drv2 in row["Driver"]:
+                    return [f"background-color:#001a3d;color:#6699ff"] * len(row)
             return [""] * len(row)
 
-        st.dataframe(disp.style.apply(hl, axis=1), hide_index=True,
-                     use_container_width=True, height=500)
+        st.dataframe(disp.style.apply(hl_grid, axis=1),
+                     hide_index=True, use_container_width=True, height=540)
 
     with col_r:
-        st.markdown("**🏁 Gap to Pole — Full 2025 Grid**")
-        top = grid_df.copy()
-        colors = ["#e10600" if (r["Driver"] == sel_driver and r["Team"] == sel_team)
-                  else "#444" for _, r in top.iterrows()]
+        st.markdown("**🏁 Gap to Pole Visualisation**")
+        colors = []
+        for _, r in grid_df.iterrows():
+            if r["Team"] == sel_team and r["Driver"] == drv1:
+                colors.append("#e10600")
+            elif r["Team"] == sel_team and r["Driver"] == drv2:
+                colors.append("#0066cc")
+            else:
+                colors.append("#333")
+
         fig = go.Figure(go.Bar(
-            x=top["Gap"],
-            y=top["Driver"] + " (" + top["Team"].str.split().str[-1] + ")",
-            orientation="h",
-            marker_color=colors,
-            text=top["GapStr"],
-            textposition="outside",
+            x=grid_df["Delta"],
+            y=grid_df["Driver"] + " (" + grid_df["Team"].str.split().str[-1] + ")",
+            orientation="h", marker_color=colors,
+            text=grid_df["GapStr"], textposition="outside",
         ))
         fig.update_layout(
             paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
             font=dict(color="#ccc", family="Titillium Web"),
             xaxis=dict(title="Gap to Pole (s)", gridcolor="#222"),
             yaxis=dict(autorange="reversed", tickfont=dict(size=11)),
-            height=540, margin=dict(l=0, r=70, t=10, b=40),
-        )
+            height=560, margin=dict(l=0, r=80, t=10, b=40))
         st.plotly_chart(fig, use_container_width=True)
 
+    # ── Real 2025 result if available ───────────────────────────
+    real_race = real_2025[real_2025["race"] == sel_event]
+    if not real_race.empty:
+        st.markdown("---")
+        st.markdown("**📡 Real 2025 Result vs Prediction**")
+        real_pole = real_race["real_time_seconds"].min()
+        ra,rb = st.columns(2)
+        for col, drv, pred_abs in [(ra,drv1,abs1),(rb,drv2,abs2)]:
+            real_row = real_race[real_race["driver"]==drv]
+            with col:
+                if not real_row.empty:
+                    real_t = float(real_row["real_time_seconds"].values[0])
+                    err    = pred_abs - real_t
+                    col.metric(f"{drv} — Real",      secs_to_str(real_t))
+                    col.metric(f"{drv} — Predicted", secs_to_str(pred_abs))
+                    col.metric(f"{drv} — Error",     f"{err:+.3f}s",
+                               delta_color="inverse")
+                else:
+                    col.info(f"{drv} — no 2025 data for this race")
+
 
 # ════════════════════════════════════════════
-# TAB 2 — TEAM INTELLIGENCE
+# TAB 2 — SEASON ANALYSIS
 # ════════════════════════════════════════════
 with tab2:
-    st.markdown('<div class="section-header">Team Intelligence Dashboard</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Season Analysis — Both Drivers</div>', unsafe_allow_html=True)
 
-    # Filter to 2025 team name only (use historical data for that team)
-    team_df  = df[df["Team"] == sel_team].copy()
-    field_df = df.copy()
+    # ── Predicted delta across all 2025 circuits ─────────────────
+    season_rows = []
+    for ev in ALL_EVENTS:
+        w = get_wx(ev)
+        for drv, col_tag in [(drv1,"#e10600"),(drv2,"#0066cc")]:
+            dlt = predict_delta(ev, sel_team, drv, "Q3","SOFT",2,True,w)
+            season_rows.append({"Race":ev,"Driver":drv,"Delta":round(dlt,3)})
+    season_df = pd.DataFrame(season_rows)
 
-    col_a, col_b = st.columns(2)
+    # Summary metrics per driver
+    s1 = season_df[season_df["Driver"]==drv1]["Delta"]
+    s2 = season_df[season_df["Driver"]==drv2]["Delta"]
 
-    with col_a:
-        st.markdown("**📈 Team Avg Qualifying Time by Year vs Field**")
-        yr_team  = team_df.groupby("Year")["LapTime_sec"].mean().reset_index()
-        yr_field = field_df.groupby("Year")["LapTime_sec"].mean().reset_index()
-        fig2 = go.Figure()
-        fig2.add_trace(go.Scatter(x=yr_team["Year"],  y=yr_team["LapTime_sec"],
-            mode="lines+markers", name=sel_team,
-            line=dict(color="#e10600", width=3), marker=dict(size=8)))
-        fig2.add_trace(go.Scatter(x=yr_field["Year"], y=yr_field["LapTime_sec"],
-            mode="lines+markers", name="Field Average",
-            line=dict(color="#555", width=2, dash="dash"), marker=dict(size=6)))
-        fig2.update_layout(
-            paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
-            font=dict(color="#ccc", family="Titillium Web"),
-            xaxis=dict(gridcolor="#222"), yaxis=dict(title="Avg Lap (s)", gridcolor="#222"),
-            legend=dict(bgcolor="#1a1a2e"), height=300, margin=dict(l=0,r=0,t=10,b=40))
-        st.plotly_chart(fig2, use_container_width=True)
+    st.markdown("**📊 Predicted Gap to Pole — All 2025 Circuits**")
 
-    with col_b:
-        st.markdown("**🏁 Performance by Circuit Type vs Field**")
-        cperf  = team_df.groupby("TrackType")["LapTime_sec"].mean().reset_index()
-        cfield = field_df.groupby("TrackType")["LapTime_sec"].mean().reset_index()
-        cperf["Field"] = cperf["TrackType"].map(
-            dict(zip(cfield["TrackType"], cfield["LapTime_sec"])))
-        fig3 = go.Figure()
-        fig3.add_trace(go.Bar(name=sel_team, x=cperf["TrackType"], y=cperf["LapTime_sec"],
-            marker_color="#e10600"))
-        fig3.add_trace(go.Bar(name="Field", x=cperf["TrackType"], y=cperf["Field"],
-            marker_color="#444"))
-        fig3.update_layout(barmode="group",
-            paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
-            font=dict(color="#ccc", family="Titillium Web"),
-            yaxis=dict(title="Avg Lap (s)", gridcolor="#222"),
-            legend=dict(bgcolor="#1a1a2e"), height=300, margin=dict(l=0,r=0,t=10,b=40))
-        st.plotly_chart(fig3, use_container_width=True)
+    ma,mb = st.columns(2)
+    with ma:
+        st.markdown(f"<div style='color:#e10600;font-size:20px;font-weight:900;text-align:center'>{drv1}</div>",
+                    unsafe_allow_html=True)
+        ca1,ca2,ca3 = st.columns(3)
+        ca1.metric("Avg Gap to Pole", f"+{s1.mean():.3f}s")
+        ca2.metric("Best Circuit",    season_df[season_df["Driver"]==drv1].nsmallest(1,"Delta")["Race"].values[0].split()[0])
+        ca3.metric("Worst Circuit",   season_df[season_df["Driver"]==drv1].nlargest(1,"Delta")["Race"].values[0].split()[0])
+    with mb:
+        st.markdown(f"<div style='color:#0066cc;font-size:20px;font-weight:900;text-align:center'>{drv2}</div>",
+                    unsafe_allow_html=True)
+        cb1,cb2,cb3 = st.columns(3)
+        cb1.metric("Avg Gap to Pole", f"+{s2.mean():.3f}s")
+        cb2.metric("Best Circuit",    season_df[season_df["Driver"]==drv2].nsmallest(1,"Delta")["Race"].values[0].split()[0])
+        cb3.metric("Worst Circuit",   season_df[season_df["Driver"]==drv2].nlargest(1,"Delta")["Race"].values[0].split()[0])
 
-    st.markdown("**⚡ Delta vs Field by Speed Class (negative = faster than field)**")
-    sperf  = team_df.groupby("LapSpeedClass")["LapTime_sec"].mean().reset_index()
-    sfield = field_df.groupby("LapSpeedClass")["LapTime_sec"].mean().reset_index()
-    sperf["Field"] = sperf["LapSpeedClass"].map(
-        dict(zip(sfield["LapSpeedClass"], sfield["LapTime_sec"])))
-    sperf["Delta"] = (sperf["LapTime_sec"] - sperf["Field"]).round(3)
-
-    col_c, col_d = st.columns([3, 1])
-    with col_c:
-        fig4 = go.Figure(go.Bar(
-            x=sperf["LapSpeedClass"], y=sperf["Delta"],
-            marker_color=["#4CAF50" if d < 0 else "#e10600" for d in sperf["Delta"]],
-            text=sperf["Delta"].apply(lambda x: f"{x:+.3f}s"), textposition="outside"))
-        fig4.add_hline(y=0, line_color="#888", line_dash="dash")
-        fig4.update_layout(
-            paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
-            font=dict(color="#ccc", family="Titillium Web"),
-            xaxis=dict(title="Speed Class"),
-            yaxis=dict(title="Delta vs Field (s)", gridcolor="#222"),
-            height=280, margin=dict(l=0,r=0,t=10,b=40))
-        st.plotly_chart(fig4, use_container_width=True)
-
-    with col_d:
-        st.markdown("**2025 Drivers**")
-        for drv in F1_2025_GRID[sel_team]:
-            ds = driver_skill[driver_skill["Driver"] == drv]
-            delta = ds["DriverAvgDelta"].values[0] if not ds.empty else 0
-            rookie_tag = " 🆕" if drv in ROOKIES_2025 else ""
-            st.markdown(f"**{drv}{rookie_tag}** — avg delta `+{delta:.3f}s`")
-
-    st.markdown("**📍 Best Lap per Circuit (Historical)**")
-    evbest = team_df.groupby("Event")["LapTime_sec"].min().reset_index().sort_values("LapTime_sec")
-    fig5 = px.bar(evbest, x="Event", y="LapTime_sec",
-        color="LapTime_sec", color_continuous_scale=["#e10600","#ff8800","#ffcc00"],
-        labels={"LapTime_sec": "Best Lap (s)", "Event": ""})
-    fig5.update_layout(
+    fig_season = go.Figure()
+    for drv, color in [(drv1,"#e10600"),(drv2,"#0066cc")]:
+        sd = season_df[season_df["Driver"]==drv]
+        fig_season.add_trace(go.Scatter(
+            x=sd["Race"], y=sd["Delta"], mode="lines+markers",
+            name=drv, line=dict(color=color, width=2), marker=dict(size=7)
+        ))
+    fig_season.update_layout(
         paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
         font=dict(color="#ccc", family="Titillium Web"),
-        coloraxis_showscale=False,
-        xaxis=dict(tickangle=-45, gridcolor="#222"), yaxis=dict(gridcolor="#222"),
-        height=320, margin=dict(l=0,r=0,t=10,b=110))
-    st.plotly_chart(fig5, use_container_width=True)
+        xaxis=dict(tickangle=-45, gridcolor="#222"),
+        yaxis=dict(title="Predicted Gap to Pole (s)", gridcolor="#222"),
+        legend=dict(bgcolor="#1a1a2e"),
+        height=360, margin=dict(l=0,r=0,t=10,b=120))
+    st.plotly_chart(fig_season, use_container_width=True)
+
+    # ── Head-to-head delta chart ────────────────────────────────
+    st.markdown("**⚔️ Head-to-Head Gap per Circuit  *(positive = {} faster)***".format(drv2))
+    pivot = season_df.pivot(index="Race", columns="Driver", values="Delta").reset_index()
+    if drv1 in pivot.columns and drv2 in pivot.columns:
+        pivot["H2H"] = pivot[drv1] - pivot[drv2]
+        pivot_s = pivot.sort_values("H2H")
+        fig_h2h = go.Figure(go.Bar(
+            x=pivot_s["Race"], y=pivot_s["H2H"],
+            marker_color=["#0066cc" if v>0 else "#e10600" for v in pivot_s["H2H"]],
+            text=pivot_s["H2H"].apply(lambda x: f"{x:+.3f}s"),
+            textposition="outside",
+        ))
+        fig_h2h.add_hline(y=0, line_color="#888", line_dash="dash")
+        fig_h2h.update_layout(
+            paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
+            font=dict(color="#ccc", family="Titillium Web"),
+            xaxis=dict(tickangle=-45, gridcolor="#222"),
+            yaxis=dict(title=f"[{drv1}] − [{drv2}] gap (s)", gridcolor="#222"),
+            height=320, margin=dict(l=0,r=0,t=10,b=120))
+        st.plotly_chart(fig_h2h, use_container_width=True)
+
+        wins1 = (pivot["H2H"] < 0).sum()
+        wins2 = (pivot["H2H"] > 0).sum()
+        avg   = pivot["H2H"].abs().mean()
+        w1,w2,w3 = st.columns(3)
+        w1.metric(f"{drv1} faster in",   f"{wins1} / {len(pivot)} races")
+        w2.metric(f"{drv2} faster in",   f"{wins2} / {len(pivot)} races")
+        w3.metric("Avg intra-team gap",  f"{avg:.3f}s")
+
+    # ── Circuit type breakdown ───────────────────────────────────
+    st.markdown("---")
+    st.markdown("**🏁 Performance by Circuit Type**")
+
+    ti_merged = tracks[["Event","TrackType","LapSpeedClass"]].copy()
+    season_full = season_df.merge(ti_merged, left_on="Race", right_on="Event", how="left")
+
+    ca, cb = st.columns(2)
+    for col, drv, color in [(ca, drv1, "#e10600"), (cb, drv2, "#0066cc")]:
+        with col:
+            st.markdown(f"<div style='color:{color};font-weight:700;font-size:16px'>{drv}</div>",
+                        unsafe_allow_html=True)
+            sd = season_full[season_full["Driver"]==drv]
+            by_type = sd.groupby("TrackType")["Delta"].mean().reset_index()
+            by_speed = sd.groupby("LapSpeedClass")["Delta"].mean().reset_index()
+
+            fig_t = go.Figure()
+            fig_t.add_trace(go.Bar(x=by_type["TrackType"], y=by_type["Delta"],
+                marker_color=color, name="Circuit Type"))
+            fig_t.update_layout(
+                paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
+                font=dict(color="#ccc",family="Titillium Web"),
+                yaxis=dict(title="Avg gap to pole (s)",gridcolor="#222"),
+                height=220, margin=dict(l=0,r=0,t=10,b=30))
+            st.plotly_chart(fig_t, use_container_width=True)
+
+            fig_s = go.Figure()
+            fig_s.add_trace(go.Bar(x=by_speed["LapSpeedClass"], y=by_speed["Delta"],
+                marker_color=color, name="Speed Class"))
+            fig_s.update_layout(
+                paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
+                font=dict(color="#ccc",family="Titillium Web"),
+                yaxis=dict(title="Avg gap to pole (s)",gridcolor="#222"),
+                height=220, margin=dict(l=0,r=0,t=10,b=30))
+            st.plotly_chart(fig_s, use_container_width=True)
+
+    # ── Historical team vs field ─────────────────────────────────
+    st.markdown("---")
+    st.markdown("**📈 Team Historical Qualifying Trend vs Field (2019–2024)**")
+    push = df[df["IsPushLap"]==1]
+    team_hist = push[push["Team"]==sel_team]
+    yr_team  = team_hist.groupby("Year")["LapTime_sec"].mean().reset_index()
+    yr_field = push.groupby("Year")["LapTime_sec"].mean().reset_index()
+    fig_hist = go.Figure()
+    fig_hist.add_trace(go.Scatter(x=yr_team["Year"], y=yr_team["LapTime_sec"],
+        mode="lines+markers", name=sel_team,
+        line=dict(color="#e10600",width=3), marker=dict(size=8)))
+    fig_hist.add_trace(go.Scatter(x=yr_field["Year"], y=yr_field["LapTime_sec"],
+        mode="lines+markers", name="Field Average",
+        line=dict(color="#555",width=2,dash="dash"), marker=dict(size=6)))
+    fig_hist.update_layout(
+        paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
+        font=dict(color="#ccc",family="Titillium Web"),
+        xaxis=dict(gridcolor="#222"),
+        yaxis=dict(title="Avg Lap (s)",gridcolor="#222"),
+        legend=dict(bgcolor="#1a1a2e"),
+        height=280, margin=dict(l=0,r=0,t=10,b=40))
+    st.plotly_chart(fig_hist, use_container_width=True)
 
 
 # ════════════════════════════════════════════
 # TAB 3 — R&D SIMULATOR
 # ════════════════════════════════════════════
 with tab3:
-    st.markdown('<div class="section-header">R&D Setup Simulator — Downforce Configuration</div>', unsafe_allow_html=True)
-
-    st.info("We infer downforce sensitivity from speed trap data and circuit type. "
-            "High downforce = slower straights, better cornering. "
-            "Simulated by shifting speed trap values per circuit.")
+    st.markdown('<div class="section-header">R&D Setup Simulator</div>', unsafe_allow_html=True)
+    st.info("Simulates high vs low downforce setups by shifting speed trap values. "
+            "Shows predicted gap-to-pole delta for both drivers across all circuits.")
 
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("### ⬆️ High Downforce")
-        st.markdown("*Monaco · Singapore · Hungary · Zandvoort*")
-        df_penalty = st.slider("Straight speed loss (km/h)", 5, 25, 12)
+        st.markdown("*Monaco · Singapore · Hungary*")
+        df_pen  = st.slider("Straight speed loss (km/h)", 5, 25, 12, key="hd")
     with c2:
         st.markdown("### ⬇️ Low Downforce")
-        st.markdown("*Monza · Baku · Las Vegas · Spa*")
-        df_gain = st.slider("Straight speed gain (km/h)", 5, 25, 12)
+        st.markdown("*Monza · Baku · Las Vegas*")
+        df_gain = st.slider("Straight speed gain (km/h)", 5, 25, 12, key="ld")
 
     st.markdown("---")
-    sim = []
+
+    sim_rows = []
     for _, tr in tracks.iterrows():
         ev = tr["Event"]
-        if ev not in df["Event"].values:
-            continue
-        sc = str(tr["LapSpeedClass"])
-        trap_map = {"Slow": (240,220,210,250), "Medium": (270,255,245,285), "Fast": (300,285,275,315)}
-        si1, si2, sfl, sst = trap_map.get(sc, (265,250,240,278))
+        if ev not in df["Event"].values: continue
+        sc = str(tr.get("LapSpeedClass","Medium"))
+        si1,si2,sfl,sst = TRAP_MAP.get(sc,(265,250,240,278))
+        w = get_wx(ev)
 
-        def pred_trap(s1, s2, sf, ss):
-            r = build_input(ev, sel_team, sel_driver, "Q3", "SOFT", 2, True,
-                            air_temp, track_temp, humidity, wind_speed, rainfall)
-            r["SpeedI1"] = s1; r["SpeedI2"] = s2
-            r["SpeedFL"] = sf; r["SpeedST"] = ss
-            return model.predict(r)[0]
+        for drv in [drv1, drv2]:
+            def pred_trap(s1,s2,sf,ss,d=drv):
+                inp = predict_delta.__wrapped__ if hasattr(predict_delta,'__wrapped__') else None
+                seg_map  = {"Q1":1,"Q2":2,"Q3":3}
+                cmp_map  = {"SOFT":3,"MEDIUM":2,"HARD":1,"INTER":0,"WET":-1}
+                tc = team_circuit_avg_delta[
+                    (team_circuit_avg_delta["Team"]==sel_team) &
+                    (team_circuit_avg_delta["TrackType"]==str(tr.get("TrackType","Permanent")))
+                ]
+                tc_avg = tc["TeamCircuitAvgDelta"].values[0] if not tc.empty else 1.0
+                ds = driver_skill[driver_skill["Driver"]==d]
+                dd = ds["DriverAvgDelta"].values[0] if not ds.empty else 1.5
+                row = {
+                    "Team_enc":safe_enc(le_team,sel_team),"Driver_enc":safe_enc(le_driver,d),
+                    "Event_enc":safe_enc(le_event,ev),"Year":2025,
+                    "QualiSegment_num":3,"Compound_num":3,"TyreLife":2,"FreshTyre_int":1,
+                    "IsStreet":1 if str(tr.get("TrackType","Permanent"))=="Street" else 0,
+                    "SpeedClass_num":SPEED_MAP.get(sc,2),
+                    "DRSZones":tr.get("DRSZones",2),"Altitude_m":tr.get("Altitude_m",50),
+                    "NumCorners":tr.get("NumCorners",15),"CornerDensity":tr.get("CornerDensity",0.003),
+                    "TrackLength_m":tr.get("TrackLength_m",5000),"AvgCornerSpacing_m":tr.get("AvgCornerSpacing_m",333),
+                    "AirTemp":w["AirTemp"],"TrackTemp":w["TrackTemp"],"Humidity":w["Humidity"],
+                    "Pressure":w["Pressure"],"WindSpeed":w["WindSpeed"],
+                    "Rainfall_int":1 if w["Rainfall"]>0.1 else 0,
+                    "SpeedI1":s1,"SpeedI2":s2,"SpeedFL":sf,"SpeedST":ss,
+                    "TeamCircuitAvgDelta":tc_avg,"DriverAvgDelta":dd,
+                }
+                return max(0.0, float(model.predict(pd.DataFrame([row])[features])[0]))
 
-        base = pred_trap(si1, si2, sfl, sst)
-        hi   = pred_trap(si1-df_penalty, si2-df_penalty, sfl, sst-df_penalty)
-        lo   = pred_trap(si1+df_gain,    si2+df_gain,    sfl+df_gain, sst+df_gain)
+            base = pred_trap(si1,si2,sfl,sst)
+            hi   = pred_trap(si1-df_pen, si2-df_pen, sfl,         sst-df_pen)
+            lo   = pred_trap(si1+df_gain,si2+df_gain,sfl+df_gain, sst+df_gain)
+            best_s = min(base,hi,lo)
+            rec  = "High DF" if best_s==hi else ("Low DF" if best_s==lo else "Balanced")
+            sim_rows.append({"Circuit":ev,"Driver":drv,
+                             "TrackType":tr["TrackType"],"SpeedClass":sc,
+                             "Base":round(base,3),"Hi":round(hi,3),"Lo":round(lo,3),
+                             "Hi Delta":round(hi-base,3),"Lo Delta":round(lo-base,3),
+                             "Best Setup":rec})
 
-        best = min(base, hi, lo)
-        rec  = "High DF" if best==hi else ("Low DF" if best==lo else "Balanced")
-        sim.append({"Event": ev, "TrackType": tr["TrackType"], "SpeedClass": sc,
-                    "Baseline": round(base,3), "High DF": round(hi,3), "Low DF": round(lo,3),
-                    "Hi Delta": round(hi-base,3), "Lo Delta": round(lo-base,3), "Best": rec})
+    sim_df = pd.DataFrame(sim_rows)
 
-    sim_df = pd.DataFrame(sim).sort_values("Baseline")
+    for drv, color in [(drv1,"#e10600"),(drv2,"#0066cc")]:
+        sd = sim_df[sim_df["Driver"]==drv]
+        st.markdown(f"<div style='color:{color};font-weight:700;font-size:16px;margin-top:12px'>{drv}</div>",
+                    unsafe_allow_html=True)
+        m1,m2,m3 = st.columns(3)
+        m1.metric("Hi DF wins", (sd["Hi Delta"]<sd["Lo Delta"]).sum())
+        m2.metric("Lo DF wins", (sd["Lo Delta"]<sd["Hi Delta"]).sum())
+        m3.metric("Recommendation",
+                  "High DF" if sd["Hi Delta"].mean()<sd["Lo Delta"].mean() else "Low DF")
 
-    m1, m2, m3 = st.columns(3)
-    hi_better = (sim_df["Hi Delta"] < sim_df["Lo Delta"]).sum()
-    lo_better = (sim_df["Lo Delta"] < sim_df["Hi Delta"]).sum()
-    m1.metric("Circuits: High DF wins", hi_better)
-    m2.metric("Circuits: Low DF wins",  lo_better)
-    m3.metric("Season Recommendation",
-              "High DF" if sim_df["Hi Delta"].mean() < sim_df["Lo Delta"].mean() else "Low DF")
-
-    fig_rd = go.Figure()
-    fig_rd.add_trace(go.Bar(name="High DF", x=sim_df["Event"], y=sim_df["Hi Delta"], marker_color="#e10600"))
-    fig_rd.add_trace(go.Bar(name="Low DF",  x=sim_df["Event"], y=sim_df["Lo Delta"], marker_color="#0066cc"))
-    fig_rd.add_hline(y=0, line_color="#888", line_dash="dash")
-    fig_rd.update_layout(barmode="group",
-        paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
-        font=dict(color="#ccc", family="Titillium Web"),
-        xaxis=dict(tickangle=-45, gridcolor="#222"),
-        yaxis=dict(title="Delta vs Baseline (s) — negative=faster", gridcolor="#222"),
-        legend=dict(bgcolor="#1a1a2e"), height=380, margin=dict(l=0,r=0,t=10,b=120))
-    st.plotly_chart(fig_rd, use_container_width=True)
-
-    disp_sim = sim_df[["Event","TrackType","SpeedClass","Hi Delta","Lo Delta","Best"]].copy()
-    disp_sim["Hi Delta"] = disp_sim["Hi Delta"].apply(lambda x: f"{x:+.3f}s")
-    disp_sim["Lo Delta"] = disp_sim["Lo Delta"].apply(lambda x: f"{x:+.3f}s")
-    st.dataframe(disp_sim, hide_index=True, use_container_width=True, height=400)
+        fig_rd = go.Figure()
+        fig_rd.add_trace(go.Bar(name="High DF",x=sd["Circuit"],y=sd["Hi Delta"],marker_color=color,opacity=0.9))
+        fig_rd.add_trace(go.Bar(name="Low DF", x=sd["Circuit"],y=sd["Lo Delta"],marker_color="#888",opacity=0.7))
+        fig_rd.add_hline(y=0, line_color="#888", line_dash="dash")
+        fig_rd.update_layout(barmode="group",
+            paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
+            font=dict(color="#ccc",family="Titillium Web"),
+            xaxis=dict(tickangle=-45,gridcolor="#222"),
+            yaxis=dict(title="Delta vs baseline (s)",gridcolor="#222"),
+            legend=dict(bgcolor="#1a1a2e"),
+            height=300, margin=dict(l=0,r=0,t=10,b=110))
+        st.plotly_chart(fig_rd, use_container_width=True)
 
 
 # ════════════════════════════════════════════
 # TAB 4 — 2025 ACCURACY
 # ════════════════════════════════════════════
 with tab4:
-    st.markdown('<div class="section-header">2025 Season Accuracy — Predicted vs Real</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">2025 Accuracy — Your Team vs Full Field</div>', unsafe_allow_html=True)
 
-    st.markdown("Compare the model's predicted qualifying times against the real 2025 results for every race and driver.")
-
-    # Build predictions for all 2025 drivers × all 2025 races
     @st.cache_data
-    def compute_2025_accuracy():
+    def compute_accuracy():
         rows = []
-        for _, real_row in real_2025.iterrows():
-            drv  = real_row["driver"]
-            race = real_row["race"]
-            real_t = real_row["real_time_seconds"]
-
+        for _, rr in real_2025.iterrows():
+            drv  = rr["driver"]
+            race = rr["race"]
             team = DRIVER_TEAM_2025.get(drv)
-            if team is None:
-                continue  # skip drivers not in 2025 grid
-
-            inp = build_input(race, team, drv, "Q3", "SOFT", 2, True,
-                              25, 38, 50, 3.0, False)
-            pred_t = model.predict(inp)[0]
-            error  = pred_t - real_t
-
+            if not team: continue
+            real_t  = float(rr["real_time_seconds"])
+            pred_a, delta, pole = predict_absolute(race, team, drv, "Q3","SOFT",2,True)
             rows.append({
-                "Race":        race,
-                "Driver":      drv,
-                "Team":        team,
-                "Real (s)":    round(real_t, 3),
-                "Predicted (s)": round(pred_t, 3),
-                "Error (s)":   round(error, 3),
-                "Abs Error":   round(abs(error), 3),
-                "IsRookie":    drv in ROOKIES_2025,
+                "Race":race,"Driver":drv,"Team":team,
+                "Real (s)":round(real_t,3),
+                "Predicted (s)":round(pred_a,3),
+                "Error (s)":round(pred_a-real_t,3),
+                "Abs Error":round(abs(pred_a-real_t),3),
+                "IsRookie":drv in ROOKIES_2025,
+                "IsYourTeam":team==sel_team,
             })
         return pd.DataFrame(rows)
 
-    acc_df = compute_2025_accuracy()
-
-    if acc_df.empty:
+    acc = compute_accuracy()
+    if acc.empty:
         st.warning("No matching 2025 data found.")
+        st.stop()
+
+    # ── Overall vs your team metrics ─────────────────────────────
+    full_mae  = acc["Abs Error"].mean()
+    team_acc  = acc[acc["IsYourTeam"]]
+    team_mae  = team_acc["Abs Error"].mean()
+
+    st.markdown("#### Overall vs Your Team")
+    col_ov, col_tm = st.columns(2)
+    with col_ov:
+        st.markdown("**🌍 Full Field**")
+        ss_res = ((acc["Error (s)"]**2).sum())
+        ss_tot = ((acc["Real (s)"] - acc["Real (s)"].mean())**2).sum()
+        r2_2025 = 1 - ss_res/ss_tot
+        fa,fb,fc,fd = st.columns(4)
+        fa.metric("MAE",         f"{full_mae:.3f}s")
+        fb.metric("R²",          f"{r2_2025:.4f}")
+        fc.metric("Within 1s",   f"{(acc['Abs Error']<=1.0).mean()*100:.1f}%")
+        fd.metric("Within 2s",   f"{(acc['Abs Error']<=2.0).mean()*100:.1f}%")
+    with col_tm:
+        st.markdown(f"**🏎️ {sel_team}**")
+        if not team_acc.empty:
+            ta,tb,tc_,td_ = st.columns(4)
+            ta.metric("MAE",       f"{team_mae:.3f}s")
+            tb.metric("Within 1s", f"{(team_acc['Abs Error']<=1.0).mean()*100:.1f}%")
+            tc_.metric(f"{drv1} MAE", f"{team_acc[team_acc['Driver']==drv1]['Abs Error'].mean():.3f}s")
+            td_.metric(f"{drv2} MAE", f"{team_acc[team_acc['Driver']==drv2]['Abs Error'].mean():.3f}s")
+
+    bias = acc["Error (s)"].mean()
+    if abs(bias) > 0.2:
+        st.warning(f"⚠️ Model has a systematic bias of **{bias:+.3f}s** — it tends to {'over' if bias>0 else 'under'}-predict.")
     else:
-        # ── Summary metrics ──────────────────────────────
-        overall_mae = acc_df["Abs Error"].mean()
-        overall_r2  = 1 - (
-            ((acc_df["Error (s)"]**2).sum()) /
-            ((acc_df["Real (s)"] - acc_df["Real (s)"].mean())**2).sum()
-        )
-        within_1s = (acc_df["Abs Error"] <= 1.0).mean() * 100
-        within_2s = (acc_df["Abs Error"] <= 2.0).mean() * 100
+        st.success(f"✅ Model is well-calibrated. Bias: {bias:+.3f}s")
 
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Overall MAE (2025)", f"{overall_mae:.3f}s")
-        m2.metric("R² Score (2025)",    f"{overall_r2:.4f}")
-        m3.metric("Within 1s accuracy", f"{within_1s:.1f}%")
-        m4.metric("Within 2s accuracy", f"{within_2s:.1f}%")
+    st.markdown("---")
 
-        st.markdown("---")
-
-        # ── Filters ──────────────────────────────────────
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-            filter_race = st.selectbox("Filter by Race",
-                ["All Races"] + sorted(acc_df["Race"].unique()))
-        with col_f2:
-            filter_team = st.selectbox("Filter by Team",
-                ["All Teams"] + sorted(acc_df["Team"].unique()))
-
-        filt = acc_df.copy()
-        if filter_race != "All Races":
-            filt = filt[filt["Race"] == filter_race]
-        if filter_team != "All Teams":
-            filt = filt[filt["Team"] == filter_team]
-
-        # ── Error distribution chart ──────────────────────
-        st.markdown("**📊 Prediction Error Distribution across all 2025 races**")
+    # ── Error distribution ────────────────────────────────────────
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.markdown("**Error Distribution**")
         fig_err = go.Figure()
-        fig_err.add_trace(go.Histogram(
-            x=acc_df["Error (s)"], nbinsx=40,
-            marker_color="#e10600", opacity=0.8,
-            name="Prediction Error"
-        ))
-        fig_err.add_vline(x=0, line_color="#ffffff", line_dash="dash")
+        fig_err.add_trace(go.Histogram(x=acc["Error (s)"], nbinsx=40,
+            marker_color="#e10600", opacity=0.8, name="All drivers"))
+        if not team_acc.empty:
+            fig_err.add_trace(go.Histogram(x=team_acc["Error (s)"], nbinsx=20,
+                marker_color="#0066cc", opacity=0.9, name=sel_team))
+        fig_err.add_vline(x=0, line_color="#fff", line_dash="dash")
         fig_err.update_layout(
-            paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
-            font=dict(color="#ccc", family="Titillium Web"),
-            xaxis=dict(title="Error (Predicted − Real, seconds)", gridcolor="#222"),
-            yaxis=dict(title="Count", gridcolor="#222"),
-            height=280, margin=dict(l=0,r=0,t=10,b=40))
+            barmode="overlay", paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
+            font=dict(color="#ccc",family="Titillium Web"),
+            xaxis=dict(title="Error (s)",gridcolor="#222"),
+            yaxis=dict(title="Count",gridcolor="#222"),
+            legend=dict(bgcolor="#1a1a2e"),
+            height=300, margin=dict(l=0,r=0,t=10,b=40))
         st.plotly_chart(fig_err, use_container_width=True)
 
-        # ── MAE per race ──────────────────────────────────
-        st.markdown("**🏁 MAE per Race**")
-        race_mae = acc_df.groupby("Race")["Abs Error"].mean().reset_index().sort_values("Abs Error")
-        fig_race = px.bar(race_mae, x="Race", y="Abs Error",
-            color="Abs Error", color_continuous_scale=["#4CAF50","#ffcc00","#e10600"],
-            labels={"Abs Error": "MAE (s)", "Race": ""})
-        fig_race.update_layout(
-            paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
-            font=dict(color="#ccc", family="Titillium Web"),
-            coloraxis_showscale=False,
-            xaxis=dict(tickangle=-45, gridcolor="#222"), yaxis=dict(gridcolor="#222"),
-            height=320, margin=dict(l=0,r=0,t=10,b=110))
-        st.plotly_chart(fig_race, use_container_width=True)
-
-        # ── MAE per team ──────────────────────────────────
-        st.markdown("**🏎️ MAE per Team**")
-        team_mae = acc_df.groupby("Team")["Abs Error"].mean().reset_index().sort_values("Abs Error")
-        fig_team = px.bar(team_mae, x="Team", y="Abs Error",
-            color="Abs Error", color_continuous_scale=["#4CAF50","#ffcc00","#e10600"],
-            labels={"Abs Error": "MAE (s)", "Team": ""})
-        fig_team.update_layout(
-            paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
-            font=dict(color="#ccc", family="Titillium Web"),
-            coloraxis_showscale=False,
-            xaxis=dict(tickangle=-20, gridcolor="#222"), yaxis=dict(gridcolor="#222"),
-            height=300, margin=dict(l=0,r=0,t=10,b=60))
-        st.plotly_chart(fig_team, use_container_width=True)
-
-        # ── Scatter: predicted vs real ─────────────────────
-        st.markdown("**🔵 Predicted vs Real Lap Times (all races)**")
+    with col_b:
+        st.markdown("**Predicted vs Real**")
+        mn=acc["Real (s)"].min(); mx=acc["Real (s)"].max()
         fig_sc = go.Figure()
-        # Ideal line
-        mn = acc_df["Real (s)"].min(); mx = acc_df["Real (s)"].max()
-        fig_sc.add_trace(go.Scatter(x=[mn,mx], y=[mn,mx], mode="lines",
-            line=dict(color="#888", dash="dash"), name="Perfect prediction"))
-        # Points coloured by team
-        for team in acc_df["Team"].unique():
-            td = acc_df[acc_df["Team"] == team]
-            fig_sc.add_trace(go.Scatter(
-                x=td["Real (s)"], y=td["Predicted (s)"],
-                mode="markers", name=team,
-                marker=dict(size=6, opacity=0.75),
-                text=td["Driver"] + " · " + td["Race"],
-                hovertemplate="%{text}<br>Real: %{x:.3f}s<br>Pred: %{y:.3f}s<extra></extra>"
-            ))
+        fig_sc.add_trace(go.Scatter(x=[mn,mx],y=[mn,mx],mode="lines",
+            line=dict(color="#555",dash="dash"),name="Perfect"))
+        other = acc[~acc["IsYourTeam"]]
+        fig_sc.add_trace(go.Scatter(x=other["Real (s)"],y=other["Predicted (s)"],
+            mode="markers",marker=dict(size=4,color="#444",opacity=0.6),name="Other teams",
+            text=other["Driver"]+" · "+other["Race"],
+            hovertemplate="%{text}<br>Real: %{x:.3f}s<br>Pred: %{y:.3f}s<extra></extra>"))
+        if not team_acc.empty:
+            fig_sc.add_trace(go.Scatter(x=team_acc["Real (s)"],y=team_acc["Predicted (s)"],
+                mode="markers",marker=dict(size=8,color="#e10600",opacity=0.9),name=sel_team,
+                text=team_acc["Driver"]+" · "+team_acc["Race"],
+                hovertemplate="%{text}<br>Real: %{x:.3f}s<br>Pred: %{y:.3f}s<extra></extra>"))
         fig_sc.update_layout(
-            paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
-            font=dict(color="#ccc", family="Titillium Web"),
-            xaxis=dict(title="Real Lap Time (s)", gridcolor="#222"),
-            yaxis=dict(title="Predicted Lap Time (s)", gridcolor="#222"),
-            legend=dict(bgcolor="#1a1a2e", font=dict(size=10)),
-            height=450, margin=dict(l=0,r=0,t=10,b=40))
+            paper_bgcolor="#0f0f0f",plot_bgcolor="#0f0f0f",
+            font=dict(color="#ccc",family="Titillium Web"),
+            xaxis=dict(title="Real (s)",gridcolor="#222"),
+            yaxis=dict(title="Predicted (s)",gridcolor="#222"),
+            legend=dict(bgcolor="#1a1a2e"),
+            height=300, margin=dict(l=0,r=0,t=10,b=40))
         st.plotly_chart(fig_sc, use_container_width=True)
 
-        # ── Full detail table ──────────────────────────────
-        st.markdown(f"**📋 Detailed Results — {filter_race} · {filter_team}**")
-        show = filt[["Race","Driver","Team","Real (s)","Predicted (s)","Error (s)","Abs Error","IsRookie"]].copy()
-        show["Driver"] = show.apply(
-            lambda r: f"{r['Driver']} 🆕" if r["IsRookie"] else r["Driver"], axis=1)
-        show = show.drop(columns="IsRookie").sort_values("Abs Error")
+    # ── MAE per race ──────────────────────────────────────────────
+    st.markdown("**🏁 MAE per Race**")
+    race_mae = acc.groupby("Race")["Abs Error"].mean().reset_index().sort_values("Abs Error")
+    fig_rm = px.bar(race_mae, x="Race", y="Abs Error",
+        color="Abs Error", color_continuous_scale=["#4CAF50","#ffcc00","#e10600"])
+    fig_rm.update_layout(paper_bgcolor="#0f0f0f",plot_bgcolor="#0f0f0f",
+        font=dict(color="#ccc",family="Titillium Web"),
+        coloraxis_showscale=False,
+        xaxis=dict(tickangle=-45,gridcolor="#222"),yaxis=dict(gridcolor="#222"),
+        height=300, margin=dict(l=0,r=0,t=10,b=110))
+    st.plotly_chart(fig_rm, use_container_width=True)
+
+    # ── Your team detail table ────────────────────────────────────
+    st.markdown(f"**📋 {sel_team} — Detailed Predictions vs Real 2025**")
+    if not team_acc.empty:
+        show = team_acc[["Race","Driver","Real (s)","Predicted (s)","Error (s)","Abs Error"]].copy()
+        show = show.sort_values(["Race","Driver"])
 
         def hl_err(row):
-            e = abs(row["Error (s)"])
-            if e <= 0.5:
-                return [""] * 7 + ["background-color:#003d00;color:#6bff6b"]
-            if e <= 1.5:
-                return [""] * 8
-            return [""] * 7 + ["background-color:#3d0000;color:#ff8888"]
+            styles = [""] * len(row)
+            e = abs(row["Abs Error"])
+            styles[-1] = ("background-color:#003d00;color:#6bff6b" if e <= 0.5
+                          else "background-color:#3d0000;color:#ff8888" if e > 1.5
+                          else "")
+            return styles
 
         st.dataframe(show.style.apply(hl_err, axis=1),
-                     hide_index=True, use_container_width=True, height=450)
+                     hide_index=True, use_container_width=True, height=500)
+    else:
+        st.info("No 2025 accuracy data available for this team.")
 
 # ─────────────────────────────────────────────
 # FOOTER
@@ -670,5 +833,6 @@ with tab4:
 st.markdown("---")
 st.markdown(
     "<div style='text-align:center;color:#444;font-size:12px'>"
-    "F1 Qualifying Predictor · 2025 Season · XGBoost + Streamlit · Data: 2019–2024 FastF1"
+    f"F1 Qualifying Predictor · {sel_team} · 2025 Season · "
+    "XGBoost trained on 2019–2024 FastF1 best laps · Target: gap to pole"
     "</div>", unsafe_allow_html=True)

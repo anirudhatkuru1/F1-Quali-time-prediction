@@ -1,6 +1,14 @@
 """
-F1 Qualifying Time Predictor — Model Training Script
-Run this ONCE locally: python train_model.py
+F1 Qualifying Predictor — Model Training Script
+Run once: python train_model.py
+
+KEY FIXES vs previous version:
+1. Train on BEST LAP per driver per session (not all laps)
+   - Old data had 6-7 laps per driver per session; only the best matters
+2. Predict DELTA FROM POLE, not absolute lap time
+   - Absolute times change year-to-year (regs, car pace, track resurfacing)
+   - Delta from pole is far more stable and transferable to 2025
+3. For final output: predicted_delta + real_2025_pole = accurate absolute time
 """
 
 import pandas as pd
@@ -29,176 +37,189 @@ F1_2025_GRID = {
 ROOKIES_2025 = {"ANT", "HAD", "BOR"}
 
 # ─────────────────────────────────────────────
-# 1. LOAD DATA
+# 1. LOAD
 # ─────────────────────────────────────────────
 print("Loading data...")
-df = pd.read_csv("data/data.csv")
-print(f"  Raw rows: {len(df)}")
+df     = pd.read_csv("data/data.csv")
+tracks = pd.read_csv("data/tracks.csv")
+
+raw = df[df["IsPushLap"] == 1].copy()
+raw = raw.dropna(subset=["LapTime_sec", "Team", "Driver", "Event", "TrackType"])
+print(f"  Raw push laps: {len(raw)}")
 
 # ─────────────────────────────────────────────
-# 2. CLEAN & FILTER
+# 2. BEST LAP PER DRIVER PER SESSION
+# Previous bug: model was trained on all 6-7 laps per driver per session
+# but 2025 data has only the single best time → huge mismatch
 # ─────────────────────────────────────────────
-df = df[df["IsPushLap"] == 1].copy()
-df = df.dropna(subset=["LapTime_sec", "Team", "Driver", "Event", "TrackType"])
-q_low  = df["LapTime_sec"].quantile(0.01)
-q_high = df["LapTime_sec"].quantile(0.99)
-df = df[(df["LapTime_sec"] >= q_low) & (df["LapTime_sec"] <= q_high)]
-print(f"  Clean rows: {len(df)}")
+best = (raw.sort_values("LapTime_sec")
+           .groupby(["Year", "Event", "Driver"])
+           .first()
+           .reset_index())
+print(f"  Best-lap rows (1 per driver per session): {len(best)}")
 
 # ─────────────────────────────────────────────
-# 3. FEATURE ENGINEERING
+# 3. COMPUTE DELTA FROM POLE (prediction target)
+# Predicting absolute times fails because car pace changes year to year.
+# Delta from pole is stable: VER is ~0.0s from pole, Haas is ~1.5s, etc.
+# ─────────────────────────────────────────────
+pole = (best.groupby(["Year", "Event"])["LapTime_sec"]
+            .min()
+            .reset_index()
+            .rename(columns={"LapTime_sec": "PoleTime"}))
+best = best.merge(pole, on=["Year", "Event"], how="left")
+best["DeltaFromPole"] = best["LapTime_sec"] - best["PoleTime"]
+
+# Remove outliers (crashed laps, very slow laps that snuck through)
+best = best[best["DeltaFromPole"] <= 6.0].copy()
+print(f"  After removing delta > 6s outliers: {len(best)}")
+
+# ─────────────────────────────────────────────
+# 4. FEATURE ENGINEERING
 # ─────────────────────────────────────────────
 segment_map  = {"Q1": 1, "Q2": 2, "Q3": 3}
 compound_map = {"SOFT": 3, "MEDIUM": 2, "HARD": 1, "INTER": 0, "WET": -1}
 speed_map    = {"Slow": 1, "Medium": 2, "Fast": 3}
 
-df["QualiSegment_num"] = df["QualiSegment"].map(segment_map).fillna(1)
-df["IsStreet"]         = (df["TrackType"] == "Street").astype(int)
-df["SpeedClass_num"]   = df["LapSpeedClass"].map(speed_map).fillna(2)
-df["FreshTyre_int"]    = df["FreshTyre"].astype(int)
-df["Rainfall_int"]     = df["Rainfall"].astype(int)
-df["Compound_num"]     = df["Compound"].map(compound_map).fillna(2)
+best["QualiSegment_num"] = best["QualiSegment"].map(segment_map).fillna(2)
+best["IsStreet"]         = (best["TrackType"] == "Street").astype(int)
+best["SpeedClass_num"]   = best["LapSpeedClass"].map(speed_map).fillna(2)
+best["FreshTyre_int"]    = best["FreshTyre"].astype(int)
+best["Rainfall_int"]     = best["Rainfall"].astype(int)
+best["Compound_num"]     = best["Compound"].map(compound_map).fillna(3)
 
-# Team avg per circuit type
-team_circuit_avg = (
-    df.groupby(["Team", "TrackType"])["LapTime_sec"]
+# Team avg delta per circuit type (team competitiveness proxy)
+team_circuit_avg_delta = (
+    best.groupby(["Team", "TrackType"])["DeltaFromPole"]
+    .mean().reset_index()
+    .rename(columns={"DeltaFromPole": "TeamCircuitAvgDelta"})
+)
+best = best.merge(team_circuit_avg_delta, on=["Team", "TrackType"], how="left")
+
+# Team avg absolute time (for absolute prediction anchor)
+team_circuit_avg_abs = (
+    best.groupby(["Team", "TrackType"])["LapTime_sec"]
     .mean().reset_index()
     .rename(columns={"LapTime_sec": "TeamCircuitAvg"})
 )
-df = df.merge(team_circuit_avg, on=["Team", "TrackType"], how="left")
+best = best.merge(team_circuit_avg_abs, on=["Team", "TrackType"], how="left")
 
-# Session best → driver delta
-session_best = (
-    df.groupby(["Year", "Event"])["LapTime_sec"]
-    .min().reset_index()
-    .rename(columns={"LapTime_sec": "SessionBest"})
-)
-df = df.merge(session_best, on=["Year", "Event"], how="left")
-df["LapDeltaFromBest"] = df["LapTime_sec"] - df["SessionBest"]
-
+# Driver historical avg delta from pole (driver skill)
 driver_skill = (
-    df.groupby("Driver")["LapDeltaFromBest"]
+    best.groupby("Driver")["DeltaFromPole"]
     .mean().reset_index()
-    .rename(columns={"LapDeltaFromBest": "DriverAvgDelta"})
+    .rename(columns={"DeltaFromPole": "DriverAvgDelta"})
 )
-df = df.merge(driver_skill, on="Driver", how="left")
+best = best.merge(driver_skill, on="Driver", how="left")
 
-# Team-level avg delta for rookie imputation
+# Team avg delta (for rookie imputation)
 team_avg_delta = (
-    df.groupby("Team")["LapDeltaFromBest"]
+    best.groupby("Team")["DeltaFromPole"]
     .mean().reset_index()
-    .rename(columns={"LapDeltaFromBest": "TeamAvgDelta"})
+    .rename(columns={"DeltaFromPole": "TeamAvgDelta"})
 )
 
-# Add rookies to driver_skill
-rookie_rows = []
+# Rookie imputation: use team's historical avg delta
 for team, drivers in F1_2025_GRID.items():
     for drv in drivers:
-        if drv in ROOKIES_2025:
-            td = team_avg_delta[team_avg_delta["Team"] == team]["TeamAvgDelta"]
-            delta_val = td.values[0] if not td.empty else driver_skill["DriverAvgDelta"].mean()
-            rookie_rows.append({"Driver": drv, "DriverAvgDelta": delta_val})
+        if drv in ROOKIES_2025 and drv not in driver_skill["Driver"].values:
+            td  = team_avg_delta[team_avg_delta["Team"] == team]["TeamAvgDelta"]
+            val = td.values[0] if not td.empty else driver_skill["DriverAvgDelta"].mean()
+            driver_skill = pd.concat(
+                [driver_skill, pd.DataFrame([{"Driver": drv, "DriverAvgDelta": val}])],
+                ignore_index=True
+            )
+print(f"  Rookies imputed: {ROOKIES_2025}")
 
-if rookie_rows:
-    driver_skill = pd.concat([driver_skill, pd.DataFrame(rookie_rows)], ignore_index=True)
-    print(f"  Rookie imputation: {[r['Driver'] for r in rookie_rows]}")
-
-# Historical weather averages per circuit (used as realistic defaults)
+# Weather defaults per circuit
 weather_defaults = df.groupby("Event").agg(
-    AirTemp=("AirTemp", "mean"),
-    TrackTemp=("TrackTemp", "mean"),
-    Humidity=("Humidity", "mean"),
-    WindSpeed=("WindSpeed", "mean"),
-    Pressure=("Pressure", "mean"),
-    Rainfall=("Rainfall", "mean"),
+    AirTemp=("AirTemp","mean"), TrackTemp=("TrackTemp","mean"),
+    Humidity=("Humidity","mean"), WindSpeed=("WindSpeed","mean"),
+    Pressure=("Pressure","mean"), Rainfall=("Rainfall","mean"),
 ).round(3).reset_index()
 
 # ─────────────────────────────────────────────
-# 4. LABEL ENCODERS
-# Pre-fit to include all 2025 drivers/teams
+# 5. LABEL ENCODERS (include all 2025 entities)
 # ─────────────────────────────────────────────
-all_2025_teams   = list(F1_2025_GRID.keys())
-all_2025_drivers = [d for drvs in F1_2025_GRID.values() for d in drvs]
-
-all_teams   = sorted(set(df["Team"].unique().tolist()   + all_2025_teams))
-all_drivers = sorted(set(df["Driver"].unique().tolist() + all_2025_drivers))
-all_events  = sorted(df["Event"].unique().tolist())
+all_teams   = sorted(set(best["Team"].tolist()   + list(F1_2025_GRID.keys())))
+all_drivers = sorted(set(best["Driver"].tolist() + [d for drvs in F1_2025_GRID.values() for d in drvs]))
+all_events  = sorted(best["Event"].unique().tolist())
 
 le_team   = LabelEncoder().fit(all_teams)
 le_driver = LabelEncoder().fit(all_drivers)
 le_event  = LabelEncoder().fit(all_events)
 
-df["Team_enc"]   = le_team.transform(df["Team"].astype(str))
-df["Driver_enc"] = le_driver.transform(df["Driver"].astype(str))
-df["Event_enc"]  = le_event.transform(df["Event"].astype(str))
+best["Team_enc"]   = le_team.transform(best["Team"].astype(str))
+best["Driver_enc"] = le_driver.transform(best["Driver"].astype(str))
+best["Event_enc"]  = le_event.transform(best["Event"].astype(str))
 
 # ─────────────────────────────────────────────
-# 5. FEATURES
+# 6. FEATURES AND TARGET
+# Target is DeltaFromPole (not absolute lap time)
 # ─────────────────────────────────────────────
 FEATURES = [
     "Team_enc", "Driver_enc", "Event_enc", "Year",
-    "QualiSegment_num",
-    "Compound_num", "TyreLife", "FreshTyre_int",
+    "QualiSegment_num", "Compound_num", "TyreLife", "FreshTyre_int",
     "IsStreet", "SpeedClass_num", "DRSZones", "Altitude_m",
     "NumCorners", "CornerDensity", "TrackLength_m", "AvgCornerSpacing_m",
     "AirTemp", "TrackTemp", "Humidity", "Pressure", "WindSpeed", "Rainfall_int",
     "SpeedI1", "SpeedI2", "SpeedFL", "SpeedST",
-    "TeamCircuitAvg", "DriverAvgDelta",
+    "TeamCircuitAvgDelta", "DriverAvgDelta",
 ]
 
 for col in FEATURES:
-    if df[col].isnull().any():
-        df[col] = df[col].fillna(df[col].median())
+    if best[col].isnull().any():
+        best[col] = best[col].fillna(best[col].median())
 
-X = df[FEATURES]
-y = df["LapTime_sec"]
+X = best[FEATURES]
+y = best["DeltaFromPole"]   # ← predicting gap to pole, not absolute time
 
 # ─────────────────────────────────────────────
-# 6. TIME-BASED SPLIT (train ≤2023, test 2024)
+# 7. TIME-BASED SPLIT
 # ─────────────────────────────────────────────
-X_train = X[df["Year"] <= 2023]
-y_train = y[df["Year"] <= 2023]
-X_test  = X[df["Year"] == 2024]
-y_test  = y[df["Year"] == 2024]
+X_train = X[best["Year"] <= 2023]; y_train = y[best["Year"] <= 2023]
+X_test  = X[best["Year"] == 2024]; y_test  = y[best["Year"] == 2024]
 print(f"  Train: {len(X_train)} | Test: {len(X_test)}")
 
 # ─────────────────────────────────────────────
-# 7. TRAIN
+# 8. TRAIN
 # ─────────────────────────────────────────────
-print("Training XGBoost model...")
+print("Training XGBoost model (target: delta from pole)...")
 model = xgb.XGBRegressor(
-    n_estimators=500, max_depth=6, learning_rate=0.05,
-    subsample=0.8, colsample_bytree=0.8, min_child_weight=5,
+    n_estimators=1000, max_depth=5, learning_rate=0.02,
+    subsample=0.8, colsample_bytree=0.8, min_child_weight=3,
     reg_alpha=0.1, reg_lambda=1.0, random_state=42, n_jobs=-1,
-    early_stopping_rounds=20, eval_metric="mae",
+    early_stopping_rounds=40, eval_metric="mae",
 )
-model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=50)
+model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=100)
 
 # ─────────────────────────────────────────────
-# 8. EVALUATE
+# 9. EVALUATE
 # ─────────────────────────────────────────────
 y_pred = model.predict(X_test)
 mae = mean_absolute_error(y_test, y_pred)
 r2  = r2_score(y_test, y_pred)
-print(f"\n📊 Model Performance (2024 holdout):")
+print(f"\n📊 Model Performance on 2024 holdout (delta from pole):")
 print(f"  MAE : {mae:.3f}s  |  R² : {r2:.4f}")
+print(f"  (For reference: avg pole-to-last gap is ~3.1s)")
 
 # ─────────────────────────────────────────────
-# 9. SAVE ALL ARTIFACTS
+# 10. SAVE ALL ARTIFACTS
 # ─────────────────────────────────────────────
 os.makedirs("model", exist_ok=True)
-joblib.dump(model,            "model/xgb_model.pkl")
-joblib.dump(le_team,          "model/le_team.pkl")
-joblib.dump(le_driver,        "model/le_driver.pkl")
-joblib.dump(le_event,         "model/le_event.pkl")
-joblib.dump(FEATURES,         "model/features.pkl")
-joblib.dump(team_circuit_avg, "model/team_circuit_avg.pkl")
-joblib.dump(driver_skill,     "model/driver_skill.pkl")
-joblib.dump(team_avg_delta,   "model/team_avg_delta.pkl")
-joblib.dump(weather_defaults, "model/weather_defaults.pkl")
-joblib.dump(F1_2025_GRID,     "model/f1_2025_grid.pkl")
-joblib.dump(ROOKIES_2025,     "model/rookies_2025.pkl")
-joblib.dump({"mae": round(mae, 3), "r2": round(r2, 4)}, "model/metrics.pkl")
+joblib.dump(model,                 "model/xgb_model.pkl")
+joblib.dump(le_team,               "model/le_team.pkl")
+joblib.dump(le_driver,             "model/le_driver.pkl")
+joblib.dump(le_event,              "model/le_event.pkl")
+joblib.dump(FEATURES,              "model/features.pkl")
+joblib.dump(team_circuit_avg_delta,"model/team_circuit_avg_delta.pkl")
+joblib.dump(team_circuit_avg_abs,  "model/team_circuit_avg_abs.pkl")
+joblib.dump(driver_skill,          "model/driver_skill.pkl")
+joblib.dump(team_avg_delta,        "model/team_avg_delta.pkl")
+joblib.dump(weather_defaults,      "model/weather_defaults.pkl")
+joblib.dump(F1_2025_GRID,          "model/f1_2025_grid.pkl")
+joblib.dump(ROOKIES_2025,          "model/rookies_2025.pkl")
+joblib.dump({"mae": round(mae,3), "r2": round(r2,4), "target": "delta_from_pole"}, "model/metrics.pkl")
 
 print("\n✅ All artifacts saved to /model/")
 print("Run: python -m streamlit run app.py")
