@@ -1,7 +1,6 @@
 """
 F1 Qualifying Time Predictor — Model Training Script
-Run this ONCE locally to train and save the model.
-Usage: python train_model.py
+Run this ONCE locally: python train_model.py
 """
 
 import pandas as pd
@@ -27,8 +26,6 @@ F1_2025_GRID = {
     "RB":              ["TSU", "HAD"],
     "Kick Sauber":     ["HUL", "BOR"],
 }
-
-# Rookies with no historical data — imputed from team average
 ROOKIES_2025 = {"ANT", "HAD", "BOR"}
 
 # ─────────────────────────────────────────────
@@ -43,11 +40,10 @@ print(f"  Raw rows: {len(df)}")
 # ─────────────────────────────────────────────
 df = df[df["IsPushLap"] == 1].copy()
 df = df.dropna(subset=["LapTime_sec", "Team", "Driver", "Event", "TrackType"])
-
 q_low  = df["LapTime_sec"].quantile(0.01)
 q_high = df["LapTime_sec"].quantile(0.99)
 df = df[(df["LapTime_sec"] >= q_low) & (df["LapTime_sec"] <= q_high)]
-print(f"  Clean rows after filtering: {len(df)}")
+print(f"  Clean rows: {len(df)}")
 
 # ─────────────────────────────────────────────
 # 3. FEATURE ENGINEERING
@@ -63,7 +59,7 @@ df["FreshTyre_int"]    = df["FreshTyre"].astype(int)
 df["Rainfall_int"]     = df["Rainfall"].astype(int)
 df["Compound_num"]     = df["Compound"].map(compound_map).fillna(2)
 
-# Team avg per circuit type (downforce proxy)
+# Team avg per circuit type
 team_circuit_avg = (
     df.groupby(["Team", "TrackType"])["LapTime_sec"]
     .mean().reset_index()
@@ -71,7 +67,7 @@ team_circuit_avg = (
 )
 df = df.merge(team_circuit_avg, on=["Team", "TrackType"], how="left")
 
-# Session best → driver delta from best
+# Session best → driver delta
 session_best = (
     df.groupby(["Year", "Event"])["LapTime_sec"]
     .min().reset_index()
@@ -87,32 +83,42 @@ driver_skill = (
 )
 df = df.merge(driver_skill, on="Driver", how="left")
 
-# Team-level avg delta (used for rookie imputation)
+# Team-level avg delta for rookie imputation
 team_avg_delta = (
     df.groupby("Team")["LapDeltaFromBest"]
     .mean().reset_index()
     .rename(columns={"LapDeltaFromBest": "TeamAvgDelta"})
 )
 
-# Add rookie rows to driver_skill using their team's average
+# Add rookies to driver_skill
 rookie_rows = []
 for team, drivers in F1_2025_GRID.items():
     for drv in drivers:
         if drv in ROOKIES_2025:
-            team_delta = team_avg_delta[team_avg_delta["Team"] == team]["TeamAvgDelta"]
-            delta_val  = team_delta.values[0] if not team_delta.empty else driver_skill["DriverAvgDelta"].mean()
+            td = team_avg_delta[team_avg_delta["Team"] == team]["TeamAvgDelta"]
+            delta_val = td.values[0] if not td.empty else driver_skill["DriverAvgDelta"].mean()
             rookie_rows.append({"Driver": drv, "DriverAvgDelta": delta_val})
 
 if rookie_rows:
     driver_skill = pd.concat([driver_skill, pd.DataFrame(rookie_rows)], ignore_index=True)
     print(f"  Rookie imputation: {[r['Driver'] for r in rookie_rows]}")
 
+# Historical weather averages per circuit (used as realistic defaults)
+weather_defaults = df.groupby("Event").agg(
+    AirTemp=("AirTemp", "mean"),
+    TrackTemp=("TrackTemp", "mean"),
+    Humidity=("Humidity", "mean"),
+    WindSpeed=("WindSpeed", "mean"),
+    Pressure=("Pressure", "mean"),
+    Rainfall=("Rainfall", "mean"),
+).round(3).reset_index()
+
 # ─────────────────────────────────────────────
 # 4. LABEL ENCODERS
-# Include all 2025 teams/drivers so the app never hits unseen labels
+# Pre-fit to include all 2025 drivers/teams
 # ─────────────────────────────────────────────
 all_2025_teams   = list(F1_2025_GRID.keys())
-all_2025_drivers = [d for drivers in F1_2025_GRID.values() for d in drivers]
+all_2025_drivers = [d for drvs in F1_2025_GRID.values() for d in drvs]
 
 all_teams   = sorted(set(df["Team"].unique().tolist()   + all_2025_teams))
 all_drivers = sorted(set(df["Driver"].unique().tolist() + all_2025_drivers))
@@ -127,7 +133,7 @@ df["Driver_enc"] = le_driver.transform(df["Driver"].astype(str))
 df["Event_enc"]  = le_event.transform(df["Event"].astype(str))
 
 # ─────────────────────────────────────────────
-# 5. DEFINE FEATURES
+# 5. FEATURES
 # ─────────────────────────────────────────────
 FEATURES = [
     "Team_enc", "Driver_enc", "Event_enc", "Year",
@@ -148,7 +154,7 @@ X = df[FEATURES]
 y = df["LapTime_sec"]
 
 # ─────────────────────────────────────────────
-# 6. TIME-BASED SPLIT
+# 6. TIME-BASED SPLIT (train ≤2023, test 2024)
 # ─────────────────────────────────────────────
 X_train = X[df["Year"] <= 2023]
 y_train = y[df["Year"] <= 2023]
@@ -157,22 +163,14 @@ y_test  = y[df["Year"] == 2024]
 print(f"  Train: {len(X_train)} | Test: {len(X_test)}")
 
 # ─────────────────────────────────────────────
-# 7. TRAIN XGBOOST
+# 7. TRAIN
 # ─────────────────────────────────────────────
 print("Training XGBoost model...")
 model = xgb.XGBRegressor(
-    n_estimators=500,
-    max_depth=6,
-    learning_rate=0.05,
-    subsample=0.8,
-    colsample_bytree=0.8,
-    min_child_weight=5,
-    reg_alpha=0.1,
-    reg_lambda=1.0,
-    random_state=42,
-    n_jobs=-1,
-    early_stopping_rounds=20,
-    eval_metric="mae",
+    n_estimators=500, max_depth=6, learning_rate=0.05,
+    subsample=0.8, colsample_bytree=0.8, min_child_weight=5,
+    reg_alpha=0.1, reg_lambda=1.0, random_state=42, n_jobs=-1,
+    early_stopping_rounds=20, eval_metric="mae",
 )
 model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=50)
 
@@ -183,8 +181,7 @@ y_pred = model.predict(X_test)
 mae = mean_absolute_error(y_test, y_pred)
 r2  = r2_score(y_test, y_pred)
 print(f"\n📊 Model Performance (2024 holdout):")
-print(f"  MAE : {mae:.3f}s")
-print(f"  R²  : {r2:.4f}")
+print(f"  MAE : {mae:.3f}s  |  R² : {r2:.4f}")
 
 # ─────────────────────────────────────────────
 # 9. SAVE ALL ARTIFACTS
@@ -198,6 +195,7 @@ joblib.dump(FEATURES,         "model/features.pkl")
 joblib.dump(team_circuit_avg, "model/team_circuit_avg.pkl")
 joblib.dump(driver_skill,     "model/driver_skill.pkl")
 joblib.dump(team_avg_delta,   "model/team_avg_delta.pkl")
+joblib.dump(weather_defaults, "model/weather_defaults.pkl")
 joblib.dump(F1_2025_GRID,     "model/f1_2025_grid.pkl")
 joblib.dump(ROOKIES_2025,     "model/rookies_2025.pkl")
 joblib.dump({"mae": round(mae, 3), "r2": round(r2, 4)}, "model/metrics.pkl")
