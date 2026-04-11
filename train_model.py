@@ -1,15 +1,3 @@
-"""
-F1 Qualifying Predictor — Model Training Script
-Run once: python train_model.py
-
-KEY FIXES vs previous version:
-1. Train on BEST LAP per driver per session (not all laps)
-   - Old data had 6-7 laps per driver per session; only the best matters
-2. Predict DELTA FROM POLE, not absolute lap time
-   - Absolute times change year-to-year (regs, car pace, track resurfacing)
-   - Delta from pole is far more stable and transferable to 2025
-3. For final output: predicted_delta + real_2025_pole = accurate absolute time
-"""
 
 import pandas as pd
 import numpy as np
@@ -48,20 +36,13 @@ raw = raw.dropna(subset=["LapTime_sec", "Team", "Driver", "Event", "TrackType"])
 print(f"  Raw push laps: {len(raw)}")
 
 # ─────────────────────────────────────────────
-# 2. BEST LAP PER DRIVER PER SESSION
-# Previous bug: model was trained on all 6-7 laps per driver per session
-# but 2025 data has only the single best time → huge mismatch
-# ─────────────────────────────────────────────
 best = (raw.sort_values("LapTime_sec")
            .groupby(["Year", "Event", "Driver"])
            .first()
            .reset_index())
 print(f"  Best-lap rows (1 per driver per session): {len(best)}")
 
-# ─────────────────────────────────────────────
-# 3. COMPUTE DELTA FROM POLE (prediction target)
-# Predicting absolute times fails because car pace changes year to year.
-# Delta from pole is stable: VER is ~0.0s from pole, Haas is ~1.5s, etc.
+
 # ─────────────────────────────────────────────
 pole = (best.groupby(["Year", "Event"])["LapTime_sec"]
             .min()
