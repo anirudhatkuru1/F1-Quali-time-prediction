@@ -1,7 +1,6 @@
 """
 F1 Qualifying Predictor — 2025 Season
-Single-team perspective dashboard.
-Run: python -m streamlit run app.py
+Apple-inspired design. Run: python -m streamlit run app.py
 """
 
 import streamlit as st
@@ -15,40 +14,296 @@ import os
 
 st.set_page_config(
     page_title="F1 Qualifying Predictor",
-    page_icon="🏎️",
+    page_icon="🏎",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
+# ─── Apple design system ───────────────────────────────────────────────────────
 st.markdown("""
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap');
-  html, body, [class*="css"] { font-family: 'Titillium Web', sans-serif; }
-  .stApp { background-color: #0f0f0f; }
-  h1  { color: #ffffff !important; font-weight: 900 !important; letter-spacing: 2px; }
-  h2, h3 { color: #cccccc !important; }
-  .section-header {
-    border-left: 4px solid #e10600; padding-left: 12px;
-    margin: 20px 0 14px 0; color: #ffffff;
-    font-size: 18px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+/* Apple font stack — SF Pro on Apple devices, Helvetica Neue elsewhere */
+:root {
+  --apple-font: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+                "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --c-bg:        #f5f5f7;
+  --c-surface:   #ffffff;
+  --c-surface2:  #f5f5f7;
+  --c-text1:     #1d1d1f;
+  --c-text2:     #6e6e73;
+  --c-text3:     #86868b;
+  --c-border:    rgba(0,0,0,0.08);
+  --c-blue:      #0071e3;
+  --c-blue-h:    #0077ed;
+  --c-red:       #ff3b30;
+  --c-green:     #34c759;
+  --c-divider:   rgba(0,0,0,0.1);
+  --r-sm:        8px;
+  --r-md:        12px;
+  --r-lg:        18px;
+  --r-xl:        22px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-bg:       #000000;
+    --c-surface:  #1c1c1e;
+    --c-surface2: #2c2c2e;
+    --c-text1:    #f5f5f7;
+    --c-text2:    #ababaf;
+    --c-text3:    #6e6e73;
+    --c-border:   rgba(255,255,255,0.08);
+    --c-divider:  rgba(255,255,255,0.1);
   }
-  div[data-testid="stMetricValue"] { color: #e10600 !important; font-size: 24px !important; }
-  div[data-testid="stMetricLabel"] { color: #aaaaaa !important; }
-  .driver-card {
-    background: #1a1a2e; border: 1px solid #333; border-radius: 8px;
-    padding: 16px; text-align: center; margin-bottom: 8px;
-  }
-  .wx-note { background:#1a1a2e; border:1px solid #333; border-radius:5px;
-             padding:8px 12px; color:#888; font-size:12px; margin-top:4px; }
-  .insight-box {
-    background:#1a1a2e; border:1px solid #444; border-radius:6px;
-    padding:12px 16px; margin:10px 0; color:#ccc; font-size:13px; line-height:1.6;
-  }
+}
+
+html, body, [class*="css"], [class*="st-"] {
+  font-family: var(--apple-font) !important;
+}
+
+.stApp { background: var(--c-bg) !important; }
+.stApp > header { display: none !important; }
+
+/* kill streamlit chrome */
+#MainMenu, footer, .stDeployButton, [data-testid="stToolbar"],
+[data-testid="collapsedControl"], section[data-testid="stSidebar"] { display: none !important; }
+
+[data-testid="stAppViewContainer"] { background: var(--c-bg) !important; }
+[data-testid="stVerticalBlock"] { gap: 0 !important; }
+.block-container { padding: 0 !important; max-width: 100% !important; }
+
+/* ── Nav bar ── */
+.apple-nav {
+  position: sticky; top: 0; z-index: 999;
+  background: rgba(245,245,247,0.85);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid var(--c-divider);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px; height: 52px;
+}
+@media (prefers-color-scheme: dark) {
+  .apple-nav { background: rgba(0,0,0,0.85); }
+}
+.apple-nav-team {
+  font-size: 17px; font-weight: 600; color: var(--c-text1);
+  letter-spacing: -0.02em;
+}
+.apple-nav-pills {
+  display: flex; gap: 2px;
+  background: var(--c-surface2); border-radius: 10px; padding: 3px;
+}
+.apple-nav-pill {
+  font-size: 13px; font-weight: 500; padding: 5px 16px;
+  border-radius: 8px; cursor: pointer; border: none;
+  color: var(--c-text2); background: transparent;
+  transition: all 0.15s ease;
+  font-family: var(--apple-font);
+}
+.apple-nav-pill.active {
+  background: var(--c-surface); color: var(--c-text1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 0.5px 1px rgba(0,0,0,0.06);
+}
+.apple-nav-change {
+  font-size: 13px; color: var(--c-blue); cursor: pointer;
+  font-weight: 400; background: none; border: none;
+  font-family: var(--apple-font); padding: 0;
+}
+
+/* ── Page wrapper ── */
+.apple-page { max-width: 980px; margin: 0 auto; padding: 0 22px 80px; }
+
+/* ── Section title ── */
+.apple-section-title {
+  font-size: 28px; font-weight: 600; color: var(--c-text1);
+  letter-spacing: -0.03em; margin: 44px 0 4px;
+}
+.apple-section-sub {
+  font-size: 15px; color: var(--c-text2); margin: 0 0 24px;
+  font-weight: 400;
+}
+
+/* ── Circuit selector row ── */
+.selector-row {
+  display: flex; gap: 10px; margin-bottom: 28px; flex-wrap: wrap;
+}
+
+/* ── Driver cards (prediction) ── */
+.driver-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.driver-card {
+  background: var(--c-surface); border-radius: var(--r-xl);
+  padding: 24px 24px 20px;
+  border: 0.5px solid var(--c-border);
+}
+.driver-card-eyebrow {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--c-text3); margin-bottom: 6px;
+}
+.driver-card-name {
+  font-size: 40px; font-weight: 700; letter-spacing: -0.04em;
+  color: var(--c-text1); margin-bottom: 20px; line-height: 1;
+}
+.driver-card-time {
+  font-size: 28px; font-weight: 600; letter-spacing: -0.03em;
+  color: var(--c-text1); margin-bottom: 4px;
+}
+.driver-card-gap {
+  font-size: 14px; color: var(--c-text2); margin-bottom: 16px;
+}
+.driver-card-stats { display: flex; gap: 20px; }
+.driver-stat { }
+.driver-stat-label { font-size: 11px; color: var(--c-text3); margin-bottom: 2px; }
+.driver-stat-val { font-size: 15px; font-weight: 600; color: var(--c-text1); }
+
+/* ── Gap badge ── */
+.gap-badge {
+  background: var(--c-surface); border-radius: var(--r-lg);
+  border: 0.5px solid var(--c-border);
+  padding: 14px 20px; text-align: center; margin-bottom: 28px;
+  font-size: 14px; color: var(--c-text2);
+}
+.gap-badge strong { color: var(--c-text1); }
+.gap-badge .faster { color: var(--c-blue); font-weight: 600; }
+
+/* ── Grid table ── */
+.grid-section-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--c-text3); margin-bottom: 10px;
+}
+.grid-table {
+  background: var(--c-surface); border-radius: var(--r-lg);
+  border: 0.5px solid var(--c-border); overflow: hidden;
+}
+.grid-header {
+  display: grid; grid-template-columns: 36px 10px 52px 1fr 80px;
+  padding: 8px 16px; border-bottom: 0.5px solid var(--c-divider);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--c-text3); gap: 8px; align-items: center;
+}
+.grid-row {
+  display: grid; grid-template-columns: 36px 10px 52px 1fr 80px;
+  padding: 9px 16px; border-bottom: 0.5px solid var(--c-divider);
+  align-items: center; gap: 8px; transition: background 0.1s;
+}
+.grid-row:last-child { border-bottom: none; }
+.grid-row.highlight-d1 { background: rgba(255, 159, 10, 0.06); }
+.grid-row.highlight-d2 { background: rgba(0, 113, 227, 0.05); }
+.grid-pos { font-size: 13px; font-weight: 500; color: var(--c-text3); }
+.grid-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.grid-name { font-size: 14px; font-weight: 600; color: var(--c-text1); letter-spacing: -0.01em; }
+.grid-name.d1 { color: #ff9f0a; }
+.grid-name.d2 { color: var(--c-blue); }
+.grid-name.rookie::after { content: ' N'; font-size: 10px; color: var(--c-text3); vertical-align: super; font-weight: 400; }
+.grid-bar-wrap { height: 3px; background: var(--c-surface2); border-radius: 2px; width: 100%; }
+.grid-bar { height: 3px; border-radius: 2px; background: var(--c-text3); min-width: 2px; }
+.grid-gap { font-size: 13px; color: var(--c-text2); text-align: right; font-variant-numeric: tabular-nums; }
+.grid-gap.pole { color: var(--c-text1); font-weight: 600; }
+
+/* ── Metric cards (analyse) ── */
+.metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px; }
+.metric-card {
+  background: var(--c-surface); border-radius: var(--r-lg);
+  border: 0.5px solid var(--c-border); padding: 16px 18px;
+}
+.metric-card-label { font-size: 12px; color: var(--c-text2); margin-bottom: 4px; }
+.metric-card-val { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--c-text1); }
+.metric-card-sub { font-size: 12px; color: var(--c-text3); margin-top: 2px; }
+
+/* ── Chart wrapper ── */
+.chart-card {
+  background: var(--c-surface); border-radius: var(--r-lg);
+  border: 0.5px solid var(--c-border); padding: 20px 20px 10px;
+  margin-bottom: 12px;
+}
+.chart-card-title { font-size: 13px; font-weight: 600; color: var(--c-text1); margin-bottom: 2px; }
+.chart-card-sub { font-size: 12px; color: var(--c-text2); margin-bottom: 12px; }
+
+/* ── Analyse sub-nav ── */
+.sub-nav {
+  display: flex; gap: 0; margin-bottom: 28px;
+  border-bottom: 0.5px solid var(--c-divider);
+}
+.sub-nav-item {
+  font-size: 14px; color: var(--c-text2); padding: 10px 0;
+  margin-right: 28px; cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all 0.15s; font-weight: 400;
+}
+.sub-nav-item.active { color: var(--c-text1); font-weight: 600; border-bottom-color: var(--c-text1); }
+
+/* ── Accuracy insight box ── */
+.insight-card {
+  background: var(--c-surface); border-radius: var(--r-lg);
+  border: 0.5px solid var(--c-border); padding: 20px 22px;
+  margin-bottom: 12px;
+}
+.insight-title { font-size: 14px; font-weight: 600; color: var(--c-text1); margin-bottom: 8px; }
+.insight-body { font-size: 14px; color: var(--c-text2); line-height: 1.6; }
+.insight-highlight { color: var(--c-text1); font-weight: 600; }
+
+/* ── Real vs predicted table ── */
+.result-table {
+  background: var(--c-surface); border-radius: var(--r-lg);
+  border: 0.5px solid var(--c-border); overflow: hidden; margin-bottom: 12px;
+}
+.result-row {
+  display: grid; grid-template-columns: 48px 1fr 80px 80px 80px;
+  padding: 10px 16px; border-bottom: 0.5px solid var(--c-divider);
+  font-size: 13px; align-items: center; gap: 8px;
+}
+.result-row:last-child { border-bottom: none; }
+.result-row.header { background: var(--c-surface2); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-text3); }
+.result-good { color: var(--c-green); }
+.result-bad  { color: var(--c-red); }
+
+/* ── Weather toggle ── */
+.wx-toggle {
+  background: var(--c-surface); border-radius: var(--r-lg);
+  border: 0.5px solid var(--c-border); padding: 14px 18px;
+  margin-bottom: 22px; cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.wx-toggle-label { font-size: 14px; color: var(--c-text1); font-weight: 500; }
+.wx-toggle-val { font-size: 13px; color: var(--c-text2); }
+
+/* ── Team selector overlay ── */
+.team-selector-page { padding: 80px 22px; text-align: center; max-width: 640px; margin: 0 auto; }
+.team-selector-headline { font-size: 48px; font-weight: 700; letter-spacing: -0.04em;
+  color: var(--c-text1); margin-bottom: 12px; line-height: 1.1; }
+.team-selector-sub { font-size: 19px; color: var(--c-text2); margin-bottom: 44px; font-weight: 400; }
+.team-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; text-align: left; }
+.team-btn {
+  background: var(--c-surface); border: 0.5px solid var(--c-border);
+  border-radius: var(--r-lg); padding: 16px 20px; cursor: pointer;
+  transition: all 0.15s ease; width: 100%;
+  font-family: var(--apple-font); text-align: left;
+}
+.team-btn:hover { border-color: rgba(0,0,0,0.18); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.team-btn-name { font-size: 15px; font-weight: 600; color: var(--c-text1); margin-bottom: 4px; }
+.team-btn-drivers { font-size: 13px; color: var(--c-text2); }
+
+/* ── Streamlit overrides ── */
+div[data-testid="stSelectbox"] > div > div {
+  background: var(--c-surface) !important;
+  border: 0.5px solid var(--c-border) !important;
+  border-radius: var(--r-md) !important;
+  font-size: 14px !important;
+  color: var(--c-text1) !important;
+}
+div[data-testid="stSlider"] { padding: 0 !important; }
+div[data-testid="stCheckbox"] label { font-size: 14px !important; color: var(--c-text1) !important; }
+div[data-testid="stMetricValue"] { color: var(--c-text1) !important; }
+.stPlotlyChart { border-radius: var(--r-lg) !important; }
+
+/* hide streamlit plot toolbar */
+.modebar { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# LOAD
+# LOAD ARTIFACTS
 # ─────────────────────────────────────────────
 @st.cache_resource
 def load_artifacts():
@@ -77,8 +332,19 @@ def load_data():
     )
 
 if not os.path.exists("model/xgb_model.pkl"):
-    st.error("Model not trained yet. Run `python train_model.py` first.")
-    st.code("python train_model.py")
+    st.markdown("""
+    <div style='max-width:480px;margin:120px auto;text-align:center;font-family:var(--apple-font)'>
+      <div style='font-size:48px;font-weight:700;color:#1d1d1f;letter-spacing:-0.04em;margin-bottom:12px'>
+        F1 Qualifying Predictor
+      </div>
+      <div style='font-size:17px;color:#6e6e73;margin-bottom:32px'>
+        Model not trained yet.
+      </div>
+      <code style='background:#f5f5f7;border-radius:8px;padding:12px 20px;font-size:14px;color:#1d1d1f'>
+        python train_model.py
+      </code>
+    </div>
+    """, unsafe_allow_html=True)
     st.stop()
 
 (model, le_team, le_driver, le_event, features,
@@ -91,13 +357,20 @@ TEAMS_2025       = list(F1_2025_GRID.keys())
 ALL_EVENTS       = sorted(real_2025["race"].unique())
 DRIVER_TEAM_2025 = {d: t for t, drvs in F1_2025_GRID.items() for d in drvs}
 
+# Team colours (F1 official)
+TEAM_COLORS = {
+    "Red Bull Racing": "#3671C6", "McLaren": "#FF8000", "Ferrari": "#E8002D",
+    "Mercedes": "#27F4D2", "Aston Martin": "#229971", "Alpine": "#FF87BC",
+    "Williams": "#64C4FF", "Haas F1 Team": "#B6BABD", "RB": "#6692FF",
+    "Kick Sauber": "#52E252",
+}
+
 # ─────────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────────
 def secs_to_str(s):
-    if pd.isna(s) or s <= 0: return "N/A"
-    m = int(s // 60)
-    return f"{m}:{s % 60:06.3f}"
+    if pd.isna(s) or s <= 0: return "—"
+    return f"{int(s//60)}:{s%60:06.3f}"
 
 def get_wx(event):
     row = weather_defaults[weather_defaults["Event"] == event]
@@ -116,22 +389,18 @@ SPEED_MAP = {"Slow":1,"Medium":2,"Fast":3}
 
 def predict_delta(event, team, driver, segment="Q3", compound="SOFT",
                   tyre_life=2, fresh=True, wx=None):
-    if wx is None:
-        wx = get_wx(event)
-    ti = tracks[tracks["Event"] == event]
-    if ti.empty:
-        ti_v = dict(TrackType="Permanent", LapSpeedClass="Medium", DRSZones=2,
-                    Altitude_m=50, NumCorners=15, CornerDensity=0.003,
-                    TrackLength_m=5000, AvgCornerSpacing_m=333)
-    else:
-        ti_v = ti.iloc[0].to_dict()
+    if wx is None: wx = get_wx(event)
+    ti  = tracks[tracks["Event"] == event]
+    ti_v = ti.iloc[0].to_dict() if not ti.empty else dict(
+        TrackType="Permanent", LapSpeedClass="Medium", DRSZones=2,
+        Altitude_m=50, NumCorners=15, CornerDensity=0.003,
+        TrackLength_m=5000, AvgCornerSpacing_m=333)
     track_type = str(ti_v.get("TrackType","Permanent"))
     sc         = str(ti_v.get("LapSpeedClass","Medium"))
     si1,si2,sfl,sst = TRAP_MAP.get(sc,(265,250,240,278))
     tca = team_circuit_avg_delta[
         (team_circuit_avg_delta["Team"]==team) &
-        (team_circuit_avg_delta["TrackType"]==track_type)
-    ]
+        (team_circuit_avg_delta["TrackType"]==track_type)]
     tc_avg = tca["TeamCircuitAvgDelta"].values[0] if not tca.empty else 1.0
     ds = driver_skill[driver_skill["Driver"]==driver]
     if ds.empty:
@@ -140,21 +409,22 @@ def predict_delta(event, team, driver, segment="Q3", compound="SOFT",
     else:
         drv_delta = ds["DriverAvgDelta"].values[0]
     row = {
-        "Team_enc":safe_enc(le_team,team),"Driver_enc":safe_enc(le_driver,driver),
-        "Event_enc":safe_enc(le_event,event),"Year":2025,
+        "Team_enc":safe_enc(le_team,team), "Driver_enc":safe_enc(le_driver,driver),
+        "Event_enc":safe_enc(le_event,event), "Year":2025,
         "QualiSegment_num":{"Q1":1,"Q2":2,"Q3":3}.get(segment,2),
         "Compound_num":{"SOFT":3,"MEDIUM":2,"HARD":1,"INTER":0,"WET":-1}.get(compound,3),
-        "TyreLife":tyre_life,"FreshTyre_int":int(fresh),
+        "TyreLife":tyre_life, "FreshTyre_int":int(fresh),
         "IsStreet":1 if track_type=="Street" else 0,
         "SpeedClass_num":SPEED_MAP.get(sc,2),
-        "DRSZones":ti_v.get("DRSZones",2),"Altitude_m":ti_v.get("Altitude_m",50),
-        "NumCorners":ti_v.get("NumCorners",15),"CornerDensity":ti_v.get("CornerDensity",0.003),
-        "TrackLength_m":ti_v.get("TrackLength_m",5000),"AvgCornerSpacing_m":ti_v.get("AvgCornerSpacing_m",333),
-        "AirTemp":wx["AirTemp"],"TrackTemp":wx["TrackTemp"],"Humidity":wx["Humidity"],
-        "Pressure":wx["Pressure"],"WindSpeed":wx["WindSpeed"],
+        "DRSZones":ti_v.get("DRSZones",2), "Altitude_m":ti_v.get("Altitude_m",50),
+        "NumCorners":ti_v.get("NumCorners",15), "CornerDensity":ti_v.get("CornerDensity",0.003),
+        "TrackLength_m":ti_v.get("TrackLength_m",5000),
+        "AvgCornerSpacing_m":ti_v.get("AvgCornerSpacing_m",333),
+        "AirTemp":wx["AirTemp"], "TrackTemp":wx["TrackTemp"], "Humidity":wx["Humidity"],
+        "Pressure":wx["Pressure"], "WindSpeed":wx["WindSpeed"],
         "Rainfall_int":1 if wx["Rainfall"]>0.1 else 0,
-        "SpeedI1":si1,"SpeedI2":si2,"SpeedFL":sfl,"SpeedST":sst,
-        "TeamCircuitAvgDelta":tc_avg,"DriverAvgDelta":drv_delta,
+        "SpeedI1":si1, "SpeedI2":si2, "SpeedFL":sfl, "SpeedST":sst,
+        "TeamCircuitAvgDelta":tc_avg, "DriverAvgDelta":drv_delta,
     }
     return max(0.0, float(model.predict(pd.DataFrame([row])[features])[0]))
 
@@ -168,648 +438,734 @@ def predict_absolute(event, team, driver, segment="Q3", compound="SOFT",
     pole  = get_pole_2025(event)
     if pole is None:
         push = df[df["IsPushLap"]==1]
-        pole = float(push.groupby("Event")["LapTime_sec"].min().get(event, 90.0))
+        pole = float(push.groupby("Event")["LapTime_sec"].min().get(event,90.0))
     return pole + delta, delta, pole
 
-# ─────────────────────────────────────────────
-# ACCURACY DATA — computed once, team filter applied OUTSIDE cache
-# BUG FIX: was using @st.cache_data with IsYourTeam baked in,
-# causing stale team filter when switching teams
-# ─────────────────────────────────────────────
+# Apple-style plotly theme
+def apple_layout(fig, height=280):
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial",
+                  color="#6e6e73", size=12),
+        margin=dict(l=0, r=0, t=8, b=0),
+        height=height,
+        xaxis=dict(showgrid=False, zeroline=False,
+                   tickfont=dict(size=11, color="#86868b"),
+                   linecolor="rgba(0,0,0,0.08)"),
+        yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.05)",
+                   zeroline=False, tickfont=dict(size=11, color="#86868b")),
+        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(size=12)),
+        hoverlabel=dict(bgcolor="#ffffff", bordercolor="rgba(0,0,0,0.1)",
+                       font=dict(color="#1d1d1f", size=13)),
+    )
+    return fig
+
 @st.cache_data
 def compute_all_accuracy():
-    """Compute accuracy for every 2025 driver × race. No team filter here."""
     rows = []
     for _, rr in real_2025.iterrows():
-        drv  = rr["driver"]
-        race = rr["race"]
+        drv  = rr["driver"]; race = rr["race"]
         team = DRIVER_TEAM_2025.get(drv)
         if not team: continue
         real_t = float(rr["real_time_seconds"])
         pred_a, delta, pole = predict_absolute(race, team, drv)
-        rows.append({
-            "Race":race,"Driver":drv,"Team":team,
-            "Real (s)":round(real_t,3),
-            "Predicted (s)":round(pred_a,3),
-            "Error (s)":round(pred_a-real_t,3),
-            "Abs Error":round(abs(pred_a-real_t),3),
-            "IsRookie":drv in ROOKIES_2025,
-        })
+        rows.append({"Race":race,"Driver":drv,"Team":team,
+                     "Real":round(real_t,3),"Predicted":round(pred_a,3),
+                     "Error":round(pred_a-real_t,3),
+                     "AbsError":round(abs(pred_a-real_t),3),
+                     "IsRookie":drv in ROOKIES_2025})
     return pd.DataFrame(rows)
 
 # ─────────────────────────────────────────────
-# SIDEBAR
+# SESSION STATE
 # ─────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("## 🏎️ F1 QUALI PREDICTOR")
-    st.markdown("*2025 Season — Team View*")
-    st.markdown("---")
+if "team" not in st.session_state:    st.session_state.team    = None
+if "page" not in st.session_state:    st.session_state.page    = "predict"
+if "sub"  not in st.session_state:    st.session_state.sub     = "season"
+if "wx_open" not in st.session_state: st.session_state.wx_open = False
 
-    st.markdown("### 🏎️ Select Your Team")
-    sel_team = st.selectbox("Team", TEAMS_2025, label_visibility="collapsed")
-    drv1, drv2 = F1_2025_GRID[sel_team]
-
-    st.markdown(f"""
-    <div style='background:#1a1a2e;border:1px solid #333;border-radius:6px;padding:12px;margin:8px 0'>
-      <div style='color:#888;font-size:11px;letter-spacing:1px'>2025 DRIVERS</div>
-      <div style='color:#e10600;font-size:22px;font-weight:900;margin-top:6px'>{drv1}{"  🆕" if drv1 in ROOKIES_2025 else ""}</div>
-      <div style='color:#0066cc;font-size:22px;font-weight:900'>{drv2}{"  🆕" if drv2 in ROOKIES_2025 else ""}</div>
+# ─────────────────────────────────────────────
+# TEAM SELECTION SCREEN
+# ─────────────────────────────────────────────
+if st.session_state.team is None:
+    st.markdown("""
+    <div style='max-width:640px;margin:0 auto;padding:80px 22px 40px;text-align:center;font-family:var(--apple-font)'>
+      <div style='font-size:13px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+                  color:#86868b;margin-bottom:12px'>2025 Season</div>
+      <div style='font-size:52px;font-weight:700;letter-spacing:-0.04em;color:#1d1d1f;
+                  line-height:1.1;margin-bottom:16px'>
+        F1 Qualifying<br>Predictor
+      </div>
+      <div style='font-size:19px;color:#6e6e73;margin-bottom:48px;font-weight:400'>
+        Select your team to get started.
+      </div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.markdown("### 🏁 Circuit")
-    sel_event = st.selectbox("Grand Prix", ALL_EVENTS)
-    ti_s = tracks[tracks["Event"]==sel_event]
-    if not ti_s.empty:
-        t = ti_s.iloc[0]
-        st.markdown(f"""
-        <div style='background:#1a1a2e;border:1px solid #333;border-radius:6px;padding:10px;margin-top:6px'>
-          <div style='color:#888;font-size:11px'>CIRCUIT</div>
-          <div style='color:#fff;margin-top:4px'>🏟️ {t['TrackType']} · {t['LapSpeedClass']}</div>
-          <div style='color:#aaa;font-size:12px'>📏 {t['TrackLength_m']/1000:.3f} km · {int(t['NumCorners'])} corners</div>
-          <div style='color:#aaa;font-size:12px'>🔵 {int(t['DRSZones'])} DRS · 📍 {int(t['Altitude_m'])}m</div>
-        </div>""", unsafe_allow_html=True)
+    cols = st.columns(2)
+    for i, team in enumerate(TEAMS_2025):
+        drv1, drv2 = F1_2025_GRID[team]
+        col = cols[i % 2]
+        tcolor = TEAM_COLORS.get(team, "#86868b")
+        with col:
+            if st.button(f"**{team}**\n\n{drv1}  ·  {drv2}",
+                         key=f"team_{team}", use_container_width=True):
+                st.session_state.team = team
+                st.rerun()
 
-    st.markdown("---")
-    st.markdown("### ⚙️ Session Setup")
-    quali_seg = st.selectbox("Segment", ["Q3","Q2","Q1"])
-    compound  = st.selectbox("Compound", ["SOFT","MEDIUM","HARD"])
-    tyre_life = st.slider("Tyre Age (laps)", 1, 10, 2)
-    fresh     = st.checkbox("Fresh Tyre", value=True)
+    st.stop()
 
-    st.markdown("---")
-    st.markdown("### 🌤️ Weather")
-    hist_wx     = get_wx(sel_event)
-    use_hist_wx = st.checkbox("Use historical circuit weather", value=True)
-    if use_hist_wx:
-        wx = hist_wx
-        st.markdown(f"""<div class='wx-note'>
-          Historical avg · {sel_event}<br>
-          🌡️ {hist_wx['AirTemp']:.1f}°C air · {hist_wx['TrackTemp']:.1f}°C track<br>
-          💧 {hist_wx['Humidity']:.0f}% · 💨 {hist_wx['WindSpeed']:.1f} m/s
-        </div>""", unsafe_allow_html=True)
-    else:
-        air_t   = st.slider("Air Temp (°C)",   10,45, int(hist_wx["AirTemp"]))
-        track_t = st.slider("Track Temp (°C)", 15,60, int(hist_wx["TrackTemp"]))
-        hum     = st.slider("Humidity (%)",    10,100,int(hist_wx["Humidity"]))
-        wind    = st.slider("Wind (m/s)",      0.0,15.0,float(round(hist_wx["WindSpeed"],1)))
-        rain    = st.checkbox("Rainfall", value=hist_wx["Rainfall"]>0.1)
+# ─────────────────────────────────────────────
+# MAIN APP (team selected)
+# ─────────────────────────────────────────────
+sel_team = st.session_state.team
+drv1, drv2 = F1_2025_GRID[sel_team]
+tcolor1, tcolor2 = TEAM_COLORS.get(sel_team,"#ff9f0a"), TEAM_COLORS.get(sel_team,"#0071e3")
+# Use slightly different shades for two drivers of same team
+d1_color = tcolor1
+d2_color = "#0071e3"  # always use Apple blue for #2 driver for contrast
+
+page = st.session_state.page
+
+# ── Nav bar ───────────────────────────────────────────────────────────────────
+predict_active = "active" if page == "predict" else ""
+analyse_active = "active" if page == "analyse" else ""
+
+st.markdown(f"""
+<div class='apple-nav'>
+  <span class='apple-nav-team'>{sel_team}</span>
+  <div class='apple-nav-pills'>
+    <button class='apple-nav-pill {predict_active}' id='nav-predict'>Predict</button>
+    <button class='apple-nav-pill {analyse_active}' id='nav-analyse'>Analyse</button>
+  </div>
+  <button class='apple-nav-change' id='nav-change'>Change team</button>
+</div>
+""", unsafe_allow_html=True)
+
+# Nav routing via hidden selectbox
+nav_choice = st.selectbox("nav", ["predict","analyse","change"], label_visibility="collapsed",
+                          key="nav_sel", index=["predict","analyse","change"].index(
+                              st.session_state.page if st.session_state.page in ["predict","analyse"] else "predict"))
+
+# JS to wire nav buttons → selectbox
+st.markdown("""
+<script>
+(function() {
+  function clickOption(val) {
+    const sel = window.parent.document.querySelectorAll('[data-testid="stSelectbox"]');
+    sel.forEach(s => {
+      const opts = s.querySelectorAll('option');
+      opts.forEach(o => { if (o.value === val || o.text === val) {
+        s.querySelector('select').value = o.value;
+        s.querySelector('select').dispatchEvent(new Event('change',{bubbles:true}));
+      }});
+    });
+  }
+  setTimeout(() => {
+    const p = window.parent.document.getElementById('nav-predict');
+    const a = window.parent.document.getElementById('nav-analyse');
+    const c = window.parent.document.getElementById('nav-change');
+    if (p) p.onclick = () => clickOption('predict');
+    if (a) a.onclick = () => clickOption('analyse');
+    if (c) c.onclick = () => clickOption('change');
+  }, 400);
+})();
+</script>
+""", unsafe_allow_html=True)
+
+if nav_choice == "change":
+    st.session_state.team = None
+    st.session_state.page = "predict"
+    st.rerun()
+elif nav_choice != st.session_state.page:
+    st.session_state.page = nav_choice
+    st.rerun()
+
+# ─────────────────────────────────────────────
+# PAGE: PREDICT
+# ─────────────────────────────────────────────
+if page == "predict":
+    st.markdown("<div class='apple-page'>", unsafe_allow_html=True)
+
+    # ── Selectors ─────────────────────────────
+    st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns([3, 1, 1])
+    with c1:
+        sel_event = st.selectbox("Grand Prix", ALL_EVENTS, key="pred_event",
+                                  label_visibility="collapsed")
+    with c2:
+        seg = st.selectbox("Segment", ["Q3","Q2","Q1"], key="pred_seg",
+                            label_visibility="collapsed")
+    with c3:
+        cmp = st.selectbox("Compound", ["SOFT","MEDIUM","HARD"], key="pred_cmp",
+                            label_visibility="collapsed")
+
+    # Weather toggle (collapsed by default)
+    hist_wx = get_wx(sel_event)
+    wx_label = f"🌡 {hist_wx['AirTemp']:.0f}°C · {hist_wx['TrackTemp']:.0f}°C track · {hist_wx['Humidity']:.0f}% humidity"
+
+    with st.expander(f"Weather conditions — {wx_label}", expanded=False):
+        wc1,wc2 = st.columns(2)
+        with wc1:
+            air_t   = st.slider("Air temp (°C)",   10,45, int(hist_wx["AirTemp"]),   key="wx_air")
+            track_t = st.slider("Track temp (°C)", 15,60, int(hist_wx["TrackTemp"]), key="wx_trk")
+        with wc2:
+            hum  = st.slider("Humidity (%)",   10,100, int(hist_wx["Humidity"]),  key="wx_hum")
+            wind = st.slider("Wind (m/s)",     0,15,   int(hist_wx["WindSpeed"]), key="wx_wnd")
+            rain = st.checkbox("Rainfall",     value=hist_wx["Rainfall"]>0.1,     key="wx_rain")
         wx = dict(AirTemp=air_t, TrackTemp=track_t, Humidity=hum,
                   WindSpeed=wind, Pressure=hist_wx["Pressure"],
                   Rainfall=1.0 if rain else 0.0)
+    else:
+        wx = hist_wx
 
-    st.markdown("---")
-    st.markdown(f"**MAE (2024 holdout):** `{metrics['mae']}s` · **R²:** `{metrics['r2']}`")
-    st.caption("Predicts gap to pole. Adds real 2025 pole for final time.")
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-# HEADER
-# ─────────────────────────────────────────────
-st.markdown(f"# 🏎️ {sel_team.upper()} — 2025 QUALIFYING ANALYSIS")
-pole_2025 = get_pole_2025(sel_event)
-pole_str  = f" · 2025 pole: **{secs_to_str(pole_2025)}**" if pole_2025 else ""
-st.markdown(f"*{sel_event}{pole_str}*")
-st.markdown("---")
+    # ── Predictions ───────────────────────────
+    abs1,delta1,_ = predict_absolute(sel_event,sel_team,drv1,seg,cmp,2,True,wx)
+    abs2,delta2,_ = predict_absolute(sel_event,sel_team,drv2,seg,cmp,2,True,wx)
+    faster = drv1 if abs1 < abs2 else drv2
+    gap_bt = abs(abs1-abs2)
 
-tab1, tab2, tab3, tab4 = st.tabs([
-    "🔮 Race Prediction",
-    "📊 Season Analysis",
-    "🛠️ R&D Simulator",
-    "✅ 2025 Accuracy",
-])
+    pole_2025 = get_pole_2025(sel_event)
+    ti_info   = tracks[tracks["Event"]==sel_event]
+    circuit_type = ti_info["TrackType"].values[0] if not ti_info.empty else ""
+    circuit_speed = ti_info["LapSpeedClass"].values[0] if not ti_info.empty else ""
 
-# ════════════════════════════════════════════
-# TAB 1 — RACE PREDICTION
-# ════════════════════════════════════════════
-with tab1:
-    st.markdown('<div class="section-header">Predicted Qualifying — Side by Side</div>', unsafe_allow_html=True)
+    st.markdown(f"""
+    <div style='margin-bottom:6px'>
+      <span style='font-size:13px;color:var(--c-text3)'>{circuit_type} · {circuit_speed}</span>
+      {f"<span style='font-size:13px;color:var(--c-text3);margin-left:12px'>2025 pole: <strong style='color:var(--c-text1)'>{secs_to_str(pole_2025)}</strong></span>" if pole_2025 else ""}
+    </div>
+    """, unsafe_allow_html=True)
 
-    abs1, delta1, _ = predict_absolute(sel_event, sel_team, drv1, quali_seg, compound, tyre_life, fresh, wx)
-    abs2, delta2, _ = predict_absolute(sel_event, sel_team, drv2, quali_seg, compound, tyre_life, fresh, wx)
+    # Driver cards
+    r1 = "N" if drv1 in ROOKIES_2025 else ""
+    r2 = "N" if drv2 in ROOKIES_2025 else ""
+    st.markdown(f"""
+    <div class='driver-cards'>
+      <div class='driver-card'>
+        <div class='driver-card-eyebrow'>{sel_team}</div>
+        <div class='driver-card-name' style='color:{d1_color}'>{drv1}{' <span style="font-size:14px;color:var(--c-text3)">Rookie</span>' if drv1 in ROOKIES_2025 else ''}</div>
+        <div class='driver-card-time'>{secs_to_str(abs1)}</div>
+        <div class='driver-card-gap'>+{delta1:.3f}s to pole</div>
+        <div class='driver-card-stats'>
+          <div class='driver-stat'>
+            <div class='driver-stat-label'>Compound</div>
+            <div class='driver-stat-val'>{cmp}</div>
+          </div>
+          <div class='driver-stat'>
+            <div class='driver-stat-label'>Session</div>
+            <div class='driver-stat-val'>{seg}</div>
+          </div>
+        </div>
+      </div>
+      <div class='driver-card'>
+        <div class='driver-card-eyebrow'>{sel_team}</div>
+        <div class='driver-card-name' style='color:{d2_color}'>{drv2}{' <span style="font-size:14px;color:var(--c-text3)">Rookie</span>' if drv2 in ROOKIES_2025 else ''}</div>
+        <div class='driver-card-time'>{secs_to_str(abs2)}</div>
+        <div class='driver-card-gap'>+{delta2:.3f}s to pole</div>
+        <div class='driver-card-stats'>
+          <div class='driver-stat'>
+            <div class='driver-stat-label'>Compound</div>
+            <div class='driver-stat-val'>{cmp}</div>
+          </div>
+          <div class='driver-stat'>
+            <div class='driver-stat-label'>Session</div>
+            <div class='driver-stat-val'>{seg}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class='gap-badge'>
+      Intra-team gap <strong>{gap_bt:.3f}s</strong> &nbsp;·&nbsp;
+      <span class='faster'>{faster}</span> predicted faster this circuit
+    </div>
+    """, unsafe_allow_html=True)
 
+    # ── Full grid ─────────────────────────────
     @st.cache_data
     def full_grid(event):
         rows = []
         w = get_wx(event)
         for team, drvs in F1_2025_GRID.items():
             for d in drvs:
-                dlt  = predict_delta(event, team, d, "Q3","SOFT",2,True,w)
+                dlt  = predict_delta(event,team,d,"Q3","SOFT",2,True,w)
                 pole = get_pole_2025(event) or 90.0
                 rows.append({"Team":team,"Driver":d,"Delta":dlt,
-                             "AbsTime":pole+dlt,"IsRookie":d in ROOKIES_2025})
+                             "AbsTime":pole+dlt,"IsRookie":d in ROOKIES_2025,
+                             "Color":TEAM_COLORS.get(team,"#86868b")})
         gdf = pd.DataFrame(rows).sort_values("Delta").reset_index(drop=True)
         gdf["Position"] = range(1,len(gdf)+1)
         gdf["TimeStr"]  = gdf["AbsTime"].apply(secs_to_str)
-        gdf["GapStr"]   = gdf["Delta"].apply(lambda x: "POLE" if x<0.001 else f"+{x:.3f}s")
+        gdf["GapStr"]   = gdf["Delta"].apply(lambda x:"POLE" if x<0.001 else f"+{x:.3f}s")
         return gdf
 
-    grid_df = full_grid(sel_event)
-    pos1 = grid_df[(grid_df["Driver"]==drv1)&(grid_df["Team"]==sel_team)]["Position"].values
-    pos2 = grid_df[(grid_df["Driver"]==drv2)&(grid_df["Team"]==sel_team)]["Position"].values
-    pos1 = pos1[0] if len(pos1) else "?"
-    pos2 = pos2[0] if len(pos2) else "?"
+    gdf = full_grid(sel_event)
+    max_delta = gdf["Delta"].max()
 
-    c1, mid, c2 = st.columns([5,1,5])
-    with c1:
-        st.markdown(f"""<div class='driver-card' style='border-color:#e10600'>
-          <div style='font-size:28px;font-weight:900;color:#e10600'>{drv1}{"  🆕" if drv1 in ROOKIES_2025 else ""}</div>
-          <div style='color:#888;font-size:13px'>{sel_team}</div>
-        </div>""", unsafe_allow_html=True)
-        m1a,m1b,m1c = st.columns(3)
-        m1a.metric("Predicted Time", secs_to_str(abs1))
-        m1b.metric("Gap to Pole",    f"+{delta1:.3f}s")
-        m1c.metric("Grid Position",  f"P{pos1}")
-    with mid:
-        st.markdown("<div style='text-align:center;color:#555;font-size:24px;margin-top:40px'>VS</div>",
-                    unsafe_allow_html=True)
-    with c2:
-        st.markdown(f"""<div class='driver-card' style='border-color:#0066cc'>
-          <div style='font-size:28px;font-weight:900;color:#0066cc'>{drv2}{"  🆕" if drv2 in ROOKIES_2025 else ""}</div>
-          <div style='color:#888;font-size:13px'>{sel_team}</div>
-        </div>""", unsafe_allow_html=True)
-        m2a,m2b,m2c = st.columns(3)
-        m2a.metric("Predicted Time", secs_to_str(abs2))
-        m2b.metric("Gap to Pole",    f"+{delta2:.3f}s")
-        m2c.metric("Grid Position",  f"P{pos2}")
-
-    gap_between = abs(abs1-abs2)
-    faster_drv  = drv1 if abs1<abs2 else drv2
-    st.markdown(f"""<div style='text-align:center;background:#1a1a2e;border:1px solid #333;
-                border-radius:6px;padding:10px;margin:12px 0;color:#fff'>
-      Intra-team gap: <b>{gap_between:.3f}s</b> · <span style='color:#4CAF50'>{faster_drv} predicted faster</span>
-    </div>""", unsafe_allow_html=True)
-
-    st.markdown("---")
-    col_l, col_r = st.columns(2)
-    with col_l:
-        st.markdown("**📋 Predicted Grid — Q3 · SOFT**")
-        disp = grid_df[["Position","Driver","Team","TimeStr","GapStr","IsRookie"]].copy()
-        disp["Driver"] = disp.apply(lambda r: f"{r['Driver']} 🆕" if r["IsRookie"] else r["Driver"], axis=1)
-        disp = disp.drop(columns="IsRookie")
-        disp.columns = ["Pos","Driver","Team","Lap Time","Gap"]
-
-        def hl_grid(row):
-            if row["Team"]==sel_team:
-                if drv1 in row["Driver"]: return ["background-color:#3d0000;color:#ff8888"]*len(row)
-                if drv2 in row["Driver"]: return ["background-color:#001a3d;color:#6699ff"]*len(row)
-            return [""]*len(row)
-
-        st.dataframe(disp.style.apply(hl_grid,axis=1),
-                     hide_index=True, use_container_width=True, height=540)
-    with col_r:
-        st.markdown("**🏁 Gap to Pole**")
-        colors = []
-        for _, r in grid_df.iterrows():
-            if r["Team"]==sel_team and r["Driver"]==drv1: colors.append("#e10600")
-            elif r["Team"]==sel_team and r["Driver"]==drv2: colors.append("#0066cc")
-            else: colors.append("#333")
-        fig = go.Figure(go.Bar(
-            x=grid_df["Delta"],
-            y=grid_df["Driver"]+" ("+grid_df["Team"].str.split().str[-1]+")",
-            orientation="h", marker_color=colors,
-            text=grid_df["GapStr"], textposition="outside",
-        ))
-        fig.update_layout(
-            paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
-            font=dict(color="#ccc",family="Titillium Web"),
-            xaxis=dict(title="Gap to Pole (s)",gridcolor="#222"),
-            yaxis=dict(autorange="reversed",tickfont=dict(size=11)),
-            height=560, margin=dict(l=0,r=80,t=10,b=40))
-        st.plotly_chart(fig, use_container_width=True)
-
-    real_race = real_2025[real_2025["race"]==sel_event]
-    if not real_race.empty:
-        st.markdown("---")
-        st.markdown("**📡 Real 2025 Result vs Prediction**")
-        ra,rb = st.columns(2)
-        for col, drv, pred_abs in [(ra,drv1,abs1),(rb,drv2,abs2)]:
-            real_row = real_race[real_race["driver"]==drv]
-            with col:
-                if not real_row.empty:
-                    real_t = float(real_row["real_time_seconds"].values[0])
-                    err    = pred_abs - real_t
-                    col.metric(f"{drv} — Real",      secs_to_str(real_t))
-                    col.metric(f"{drv} — Predicted", secs_to_str(pred_abs))
-                    col.metric(f"{drv} — Error",     f"{err:+.3f}s", delta_color="inverse")
-                else:
-                    col.info(f"{drv} — no 2025 data for this race")
-
-# ════════════════════════════════════════════
-# TAB 2 — SEASON ANALYSIS
-# ════════════════════════════════════════════
-with tab2:
-    st.markdown('<div class="section-header">Season Analysis — Both Drivers</div>', unsafe_allow_html=True)
-
-    season_rows = []
-    for ev in ALL_EVENTS:
-        w = get_wx(ev)
-        for drv in [drv1,drv2]:
-            dlt = predict_delta(ev, sel_team, drv, "Q3","SOFT",2,True,w)
-            season_rows.append({"Race":ev,"Driver":drv,"Delta":round(dlt,3)})
-    season_df = pd.DataFrame(season_rows)
-
-    s1 = season_df[season_df["Driver"]==drv1]["Delta"]
-    s2 = season_df[season_df["Driver"]==drv2]["Delta"]
-
-    st.markdown("**📊 Predicted Gap to Pole — All 2025 Circuits**")
-    ma,mb = st.columns(2)
-    with ma:
-        st.markdown(f"<div style='color:#e10600;font-size:18px;font-weight:900;text-align:center'>{drv1}</div>",
-                    unsafe_allow_html=True)
-        ca1,ca2,ca3 = st.columns(3)
-        ca1.metric("Avg Gap to Pole", f"+{s1.mean():.3f}s")
-        best_ev1 = season_df[season_df["Driver"]==drv1].nsmallest(1,"Delta")["Race"].values[0]
-        worst_ev1 = season_df[season_df["Driver"]==drv1].nlargest(1,"Delta")["Race"].values[0]
-        ca2.metric("Best Circuit",  best_ev1.replace(" Grand Prix",""))
-        ca3.metric("Worst Circuit", worst_ev1.replace(" Grand Prix",""))
-    with mb:
-        st.markdown(f"<div style='color:#0066cc;font-size:18px;font-weight:900;text-align:center'>{drv2}</div>",
-                    unsafe_allow_html=True)
-        cb1,cb2,cb3 = st.columns(3)
-        cb1.metric("Avg Gap to Pole", f"+{s2.mean():.3f}s")
-        best_ev2 = season_df[season_df["Driver"]==drv2].nsmallest(1,"Delta")["Race"].values[0]
-        worst_ev2 = season_df[season_df["Driver"]==drv2].nlargest(1,"Delta")["Race"].values[0]
-        cb2.metric("Best Circuit",  best_ev2.replace(" Grand Prix",""))
-        cb3.metric("Worst Circuit", worst_ev2.replace(" Grand Prix",""))
-
-    fig_season = go.Figure()
-    for drv,color in [(drv1,"#e10600"),(drv2,"#0066cc")]:
-        sd = season_df[season_df["Driver"]==drv]
-        fig_season.add_trace(go.Scatter(
-            x=sd["Race"], y=sd["Delta"], mode="lines+markers",
-            name=drv, line=dict(color=color,width=2), marker=dict(size=7)))
-    fig_season.update_layout(
-        paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
-        font=dict(color="#ccc",family="Titillium Web"),
-        xaxis=dict(tickangle=-45,gridcolor="#222"),
-        yaxis=dict(title="Predicted Gap to Pole (s)",gridcolor="#222"),
-        legend=dict(bgcolor="#1a1a2e"),
-        height=360, margin=dict(l=0,r=0,t=10,b=120))
-    st.plotly_chart(fig_season, use_container_width=True)
-
-    st.markdown(f"**⚔️ Head-to-Head per Circuit — positive = {drv2} faster**")
-    pivot = season_df.pivot(index="Race",columns="Driver",values="Delta").reset_index()
-    if drv1 in pivot.columns and drv2 in pivot.columns:
-        pivot["H2H"] = pivot[drv1] - pivot[drv2]
-        pivot_s = pivot.sort_values("H2H")
-        fig_h2h = go.Figure(go.Bar(
-            x=pivot_s["Race"], y=pivot_s["H2H"],
-            marker_color=["#0066cc" if v>0 else "#e10600" for v in pivot_s["H2H"]],
-            text=pivot_s["H2H"].apply(lambda x: f"{x:+.3f}s"), textposition="outside"))
-        fig_h2h.add_hline(y=0, line_color="#888", line_dash="dash")
-        fig_h2h.update_layout(
-            paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
-            font=dict(color="#ccc",family="Titillium Web"),
-            xaxis=dict(tickangle=-45,gridcolor="#222"),
-            yaxis=dict(title=f"[{drv1}] − [{drv2}] (s)",gridcolor="#222"),
-            height=320, margin=dict(l=0,r=0,t=10,b=120))
-        st.plotly_chart(fig_h2h, use_container_width=True)
-        w1,w2,w3 = st.columns(3)
-        w1.metric(f"{drv1} faster in", f"{(pivot['H2H']<0).sum()} races")
-        w2.metric(f"{drv2} faster in", f"{(pivot['H2H']>0).sum()} races")
-        w3.metric("Avg intra-team gap", f"{pivot['H2H'].abs().mean():.3f}s")
-
-    st.markdown("---")
-    st.markdown("**🏁 Performance by Circuit Type & Speed Class**")
-    ti_merged = tracks[["Event","TrackType","LapSpeedClass"]].copy()
-    season_full = season_df.merge(ti_merged, left_on="Race", right_on="Event", how="left")
-    ca,cb = st.columns(2)
-    for col,drv,color in [(ca,drv1,"#e10600"),(cb,drv2,"#0066cc")]:
-        with col:
-            st.markdown(f"<div style='color:{color};font-weight:700'>{drv}</div>", unsafe_allow_html=True)
-            sd = season_full[season_full["Driver"]==drv]
-            for grp, title in [("TrackType","Circuit Type"),("LapSpeedClass","Speed Class")]:
-                by = sd.groupby(grp)["Delta"].mean().reset_index()
-                fig_t = go.Figure(go.Bar(x=by[grp],y=by["Delta"],marker_color=color))
-                fig_t.update_layout(paper_bgcolor="#0f0f0f",plot_bgcolor="#0f0f0f",
-                    font=dict(color="#ccc",family="Titillium Web"),
-                    title=dict(text=title,font=dict(size=13,color="#aaa")),
-                    yaxis=dict(title="Avg gap to pole (s)",gridcolor="#222"),
-                    height=200, margin=dict(l=0,r=0,t=30,b=30))
-                st.plotly_chart(fig_t, use_container_width=True)
-
-    st.markdown("---")
-    st.markdown("**📈 Historical Team Trend vs Field (2019–2024)**")
-    push = df[df["IsPushLap"]==1]
-    yr_team  = push[push["Team"]==sel_team].groupby("Year")["LapTime_sec"].mean().reset_index()
-    yr_field = push.groupby("Year")["LapTime_sec"].mean().reset_index()
-    fig_hist = go.Figure()
-    fig_hist.add_trace(go.Scatter(x=yr_team["Year"],y=yr_team["LapTime_sec"],
-        mode="lines+markers",name=sel_team,line=dict(color="#e10600",width=3),marker=dict(size=8)))
-    fig_hist.add_trace(go.Scatter(x=yr_field["Year"],y=yr_field["LapTime_sec"],
-        mode="lines+markers",name="Field Avg",line=dict(color="#555",width=2,dash="dash"),marker=dict(size=6)))
-    fig_hist.update_layout(paper_bgcolor="#0f0f0f",plot_bgcolor="#0f0f0f",
-        font=dict(color="#ccc",family="Titillium Web"),
-        xaxis=dict(gridcolor="#222"),yaxis=dict(title="Avg Lap (s)",gridcolor="#222"),
-        legend=dict(bgcolor="#1a1a2e"),height=280,margin=dict(l=0,r=0,t=10,b=40))
-    st.plotly_chart(fig_hist, use_container_width=True)
-
-# ════════════════════════════════════════════
-# TAB 3 — R&D SIMULATOR
-# ════════════════════════════════════════════
-with tab3:
-    st.markdown('<div class="section-header">R&D Setup Simulator</div>', unsafe_allow_html=True)
-    st.info("Simulates high vs low downforce by shifting speed trap values. "
-            "Shows predicted gap-to-pole delta for both drivers.")
-
-    c1,c2 = st.columns(2)
-    with c1:
-        st.markdown("### ⬆️ High Downforce · Monaco/Singapore/Hungary")
-        df_pen  = st.slider("Straight speed loss (km/h)", 5,25,12,key="hd")
-    with c2:
-        st.markdown("### ⬇️ Low Downforce · Monza/Baku/Las Vegas")
-        df_gain = st.slider("Straight speed gain (km/h)", 5,25,12,key="ld")
-
-    st.markdown("---")
-    sim_rows = []
-    for _, tr in tracks.iterrows():
-        ev = tr["Event"]
-        if ev not in df["Event"].values: continue
-        sc = str(tr.get("LapSpeedClass","Medium"))
-        si1,si2,sfl,sst = TRAP_MAP.get(sc,(265,250,240,278))
-        w = get_wx(ev)
-        for drv in [drv1,drv2]:
-            ds  = driver_skill[driver_skill["Driver"]==drv]
-            dd  = ds["DriverAvgDelta"].values[0] if not ds.empty else 1.5
-            tca2 = team_circuit_avg_delta[
-                (team_circuit_avg_delta["Team"]==sel_team) &
-                (team_circuit_avg_delta["TrackType"]==str(tr.get("TrackType","Permanent")))
-            ]
-            tc_avg2 = tca2["TeamCircuitAvgDelta"].values[0] if not tca2.empty else 1.0
-
-            def pred_t(s1,s2,sf,ss):
-                row = {
-                    "Team_enc":safe_enc(le_team,sel_team),"Driver_enc":safe_enc(le_driver,drv),
-                    "Event_enc":safe_enc(le_event,ev),"Year":2025,
-                    "QualiSegment_num":3,"Compound_num":3,"TyreLife":2,"FreshTyre_int":1,
-                    "IsStreet":1 if str(tr.get("TrackType","Permanent"))=="Street" else 0,
-                    "SpeedClass_num":SPEED_MAP.get(sc,2),
-                    "DRSZones":tr.get("DRSZones",2),"Altitude_m":tr.get("Altitude_m",50),
-                    "NumCorners":tr.get("NumCorners",15),"CornerDensity":tr.get("CornerDensity",0.003),
-                    "TrackLength_m":tr.get("TrackLength_m",5000),"AvgCornerSpacing_m":tr.get("AvgCornerSpacing_m",333),
-                    "AirTemp":w["AirTemp"],"TrackTemp":w["TrackTemp"],"Humidity":w["Humidity"],
-                    "Pressure":w["Pressure"],"WindSpeed":w["WindSpeed"],
-                    "Rainfall_int":1 if w["Rainfall"]>0.1 else 0,
-                    "SpeedI1":s1,"SpeedI2":s2,"SpeedFL":sf,"SpeedST":ss,
-                    "TeamCircuitAvgDelta":tc_avg2,"DriverAvgDelta":dd,
-                }
-                return max(0.0,float(model.predict(pd.DataFrame([row])[features])[0]))
-
-            base = pred_t(si1,si2,sfl,sst)
-            hi   = pred_t(si1-df_pen, si2-df_pen, sfl,         sst-df_pen)
-            lo   = pred_t(si1+df_gain,si2+df_gain,sfl+df_gain, sst+df_gain)
-            best_s = min(base,hi,lo)
-            rec  = "High DF" if best_s==hi else ("Low DF" if best_s==lo else "Balanced")
-            sim_rows.append({"Circuit":ev,"Driver":drv,"TrackType":tr["TrackType"],"SpeedClass":sc,
-                             "Hi Delta":round(hi-base,3),"Lo Delta":round(lo-base,3),"Best":rec})
-
-    sim_df = pd.DataFrame(sim_rows)
-    for drv,color in [(drv1,"#e10600"),(drv2,"#0066cc")]:
-        sd = sim_df[sim_df["Driver"]==drv]
-        st.markdown(f"<div style='color:{color};font-weight:700;font-size:16px;margin-top:16px'>{drv}</div>",
-                    unsafe_allow_html=True)
-        m1,m2,m3 = st.columns(3)
-        m1.metric("Hi DF wins", (sd["Hi Delta"]<sd["Lo Delta"]).sum())
-        m2.metric("Lo DF wins", (sd["Lo Delta"]<sd["Hi Delta"]).sum())
-        m3.metric("Recommendation",
-                  "High DF" if sd["Hi Delta"].mean()<sd["Lo Delta"].mean() else "Low DF")
-        fig_rd = go.Figure()
-        fig_rd.add_trace(go.Bar(name="High DF",x=sd["Circuit"],y=sd["Hi Delta"],
-            marker_color=color,opacity=0.9))
-        fig_rd.add_trace(go.Bar(name="Low DF",x=sd["Circuit"],y=sd["Lo Delta"],
-            marker_color="#888",opacity=0.7))
-        fig_rd.add_hline(y=0,line_color="#888",line_dash="dash")
-        fig_rd.update_layout(barmode="group",paper_bgcolor="#0f0f0f",plot_bgcolor="#0f0f0f",
-            font=dict(color="#ccc",family="Titillium Web"),
-            xaxis=dict(tickangle=-45,gridcolor="#222"),
-            yaxis=dict(title="Delta vs baseline (s)",gridcolor="#222"),
-            legend=dict(bgcolor="#1a1a2e"),height=280,margin=dict(l=0,r=0,t=10,b=110))
-        st.plotly_chart(fig_rd, use_container_width=True)
-
-# ════════════════════════════════════════════
-# TAB 4 — 2025 ACCURACY (HONEST)
-# ════════════════════════════════════════════
-with tab4:
-    st.markdown('<div class="section-header">2025 Accuracy — What the Model Actually Measures</div>',
+    st.markdown("<div class='grid-section-label'>Predicted starting grid — Q3 · SOFT</div>",
                 unsafe_allow_html=True)
 
-    # ── Honest framing first ─────────────────────────────────────
-    st.markdown("""
-    <div class='insight-box'>
-    <b>How to read this tab honestly</b><br><br>
-    This model was trained on 2019–2024 data and has <b>no knowledge of the 2025 season</b>.
-    It predicts relative driver/team performance based on historical patterns. Two things it
-    genuinely cannot know:<br><br>
-    1. <b>Car development trajectory</b> — McLaren won the 2024 championship with a 0.43s avg gap to pole,
-    their best in years. The model correctly learned this upward trend. What it cannot extrapolate is
-    whether that momentum continued into 2025 at the same rate.<br><br>
-    2. <b>Year-on-year pace shifts</b> — We handle this by predicting <i>gap to pole</i>, then anchoring
-    to the real 2025 pole time. This separates "how fast is the field this year" (we use real data)
-    from "how far behind pole is each driver" (this is what the model predicts).<br><br>
-    The right metric to judge this model is <b>ranking accuracy</b> — does it predict who is faster
-    than whom? — not raw time error.
-    </div>
-    """, unsafe_allow_html=True)
-
-    # ── Compute accuracy (no team filter baked in) ───────────────
-    acc = compute_all_accuracy()
-
-    # ── Key ranking metric: Spearman correlation ─────────────────
-    real_avg_delta = (real_2025
-        .assign(Pole=real_2025.groupby("race")["real_time_seconds"].transform("min"))
-        .assign(RealDelta=lambda x: x["real_time_seconds"] - x["Pole"])
-        .groupby("driver")["RealDelta"].mean()
-        .reset_index()
-        .rename(columns={"driver":"Driver","RealDelta":"Real2025AvgDelta"})
-    )
-    drivers_in_both = [d for d in real_avg_delta["Driver"] if d in driver_skill["Driver"].values]
-    pred_deltas = driver_skill[driver_skill["Driver"].isin(drivers_in_both)][["Driver","DriverAvgDelta"]]
-    rank_merged = real_avg_delta[real_avg_delta["Driver"].isin(drivers_in_both)].merge(pred_deltas, on="Driver")
-    spear_r, spear_p = spearmanr(rank_merged["DriverAvgDelta"], rank_merged["Real2025AvgDelta"])
-
-    # ── Metrics row ───────────────────────────────────────────────
-    st.markdown("#### Model Performance Metrics")
-    full_mae = acc["Abs Error"].mean()
-    bias     = acc["Error (s)"].mean()
-    within1  = (acc["Abs Error"]<=1.0).mean()*100
-    within2  = (acc["Abs Error"]<=2.0).mean()*100
-    ss_res   = (acc["Error (s)"]**2).sum()
-    ss_tot   = ((acc["Real (s)"]-acc["Real (s)"].mean())**2).sum()
-    r2_2025  = 1 - ss_res/ss_tot
-
-    m1,m2,m3,m4,m5,m6 = st.columns(6)
-    m1.metric("MAE (absolute)",   f"{full_mae:.3f}s")
-    m2.metric("Bias",             f"{bias:+.3f}s")
-    m3.metric("Within 1s",        f"{within1:.1f}%")
-    m4.metric("Within 2s",        f"{within2:.1f}%")
-    m5.metric("Rank correlation", f"{spear_r:.3f}")
-    m6.metric("R² (2025)",        f"{r2_2025:.4f}")
-
-    # ── Plain-English interpretation ─────────────────────────────
-    rank_interpretation = (
-        "strong" if spear_r > 0.7 else
-        "moderate" if spear_r > 0.5 else
-        "weak"
-    )
-    bias_note = (
-        f"over-predicts by {bias:.2f}s on average" if bias > 0.2
-        else f"under-predicts by {abs(bias):.2f}s on average" if bias < -0.2
-        else "well-calibrated"
-    )
+    rows_html = ""
+    for _, r in gdf.iterrows():
+        d   = r["Driver"]
+        is_d1 = (d==drv1 and r["Team"]==sel_team)
+        is_d2 = (d==drv2 and r["Team"]==sel_team)
+        hl  = "highlight-d1" if is_d1 else ("highlight-d2" if is_d2 else "")
+        nc  = ("d1" if is_d1 else ("d2" if is_d2 else ""))
+        rk  = " rookie" if r["IsRookie"] else ""
+        bar = round(r["Delta"]/max_delta*100) if max_delta>0 else 0
+        clr = r["Color"]
+        pos_disp = "P1" if r["Position"]==1 else f"P{r['Position']}"
+        gap_cls = "pole" if r["GapStr"]=="POLE" else ""
+        rows_html += f"""
+        <div class='grid-row {hl}'>
+          <span class='grid-pos'>{pos_disp}</span>
+          <span class='grid-dot' style='background:{clr}'></span>
+          <span class='grid-name {nc}{rk}'>{d}</span>
+          <div class='grid-bar-wrap'><div class='grid-bar' style='width:{bar}%;background:{clr}'></div></div>
+          <span class='grid-gap {gap_cls}'>{r["GapStr"]}</span>
+        </div>"""
 
     st.markdown(f"""
-    <div class='insight-box'>
-    <b>What these numbers mean:</b><br><br>
-    • <b>Rank correlation: {spear_r:.3f}</b> ({rank_interpretation}) — this is the most important metric.
-    A Spearman r of {spear_r:.2f} means the model correctly orders drivers relative to each other with
-    {rank_interpretation} statistical confidence (p={spear_p:.3f}). Random guessing would give ~0.0.<br><br>
-    • <b>MAE: {full_mae:.3f}s</b> — average absolute time error. The pole-to-last spread in 2025 is ~3.1s,
-    so the model is off by roughly {full_mae/3.1*100:.0f}% of that spread.<br><br>
-    • <b>Bias: {bias_note}</b> — a positive bias means predicted times are slightly too slow.
-    This is expected: the model was trained on older data and 2025 cars may be faster at certain circuits.<br><br>
-    • <b>Within 1s: {within1:.1f}%</b> — {within1:.0f}% of all predictions land within 1 second of reality.
-    For context, 1 second in F1 qualifying is a substantial gap.
+    <div class='grid-table'>
+      <div class='grid-header'>
+        <span></span><span></span><span>Driver</span>
+        <span></span><span style='text-align:right'>Gap</span>
+      </div>
+      {rows_html}
     </div>
     """, unsafe_allow_html=True)
 
-    # ── McLaren specific callout ──────────────────────────────────
-    mclaren_acc = acc[acc["Team"]=="McLaren"]
-    if not mclaren_acc.empty:
-        mcl_mae = mclaren_acc["Abs Error"].mean()
-        mcl_bias = mclaren_acc["Error (s)"].mean()
+    # Real 2025 comparison (compact)
+    real_race = real_2025[real_2025["race"]==sel_event]
+    if not real_race.empty:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        st.markdown("<div class='grid-section-label'>Real 2025 result vs prediction</div>",
+                    unsafe_allow_html=True)
+        r_html = ""
+        for drv, pred_abs in [(drv1,abs1),(drv2,abs2)]:
+            rr = real_race[real_race["driver"]==drv]
+            if not rr.empty:
+                rt   = float(rr["real_time_seconds"].values[0])
+                err  = pred_abs - rt
+                ec   = "result-good" if abs(err)<=0.5 else ("result-bad" if abs(err)>1.5 else "")
+                clr  = d1_color if drv==drv1 else d2_color
+                r_html += f"""
+                <div class='result-row'>
+                  <span style='font-size:14px;font-weight:600;color:{clr}'>{drv}</span>
+                  <span style='color:var(--c-text1)'>{secs_to_str(rt)}</span>
+                  <span style='color:var(--c-text2)'>{secs_to_str(pred_abs)}</span>
+                  <span class='{ec}'>{err:+.3f}s</span>
+                </div>"""
         st.markdown(f"""
-        <div class='insight-box' style='border-color:#ff8c00'>
-        <b>🍊 McLaren specifically:</b><br><br>
-        McLaren's 2024 avg gap to pole was <b>0.43s</b> — their best in 6 years and 1st in the field.
-        The model <i>correctly learned</i> this upward trajectory: McLaren is predicted as a top-2 team.
-        <br><br>
-        The model's MAE for McLaren drivers across 2025 is <b>{mcl_mae:.3f}s</b>
-        (bias: {mcl_bias:+.3f}s). If it shows McLaren as mid-table on a specific circuit,
-        it's because that circuit type historically hasn't suited them — which is
-        a legitimate signal, not a bug. For example, McLaren historically underperforms
-        on high-downforce street circuits relative to their pace at high-speed tracks.
+        <div class='result-table'>
+          <div class='result-row header'>
+            <span>Driver</span><span>Real</span><span>Predicted</span><span>Error</span>
+          </div>
+          {r_html}
         </div>
         """, unsafe_allow_html=True)
 
-    # ── Ranking chart: predicted vs real ─────────────────────────
-    st.markdown("---")
-    st.markdown("**🏆 Ranking Accuracy — Predicted vs Real 2025 Average Delta from Pole**")
-    rank_merged["Team"] = rank_merged["Driver"].map(DRIVER_TEAM_2025)
-    rank_merged_s = rank_merged.sort_values("Real2025AvgDelta")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    fig_rank = go.Figure()
-    fig_rank.add_trace(go.Scatter(
-        x=rank_merged_s["Real2025AvgDelta"], y=rank_merged_s["DriverAvgDelta"],
-        mode="markers+text", text=rank_merged_s["Driver"],
-        textposition="top center", textfont=dict(size=10),
-        marker=dict(size=10, color=[
-            "#e10600" if t==sel_team else "#444"
-            for t in rank_merged_s["Team"]
-        ], opacity=0.9),
-        hovertemplate="%{text}<br>Real: %{x:.3f}s<br>Pred: %{y:.3f}s<extra></extra>"
-    ))
-    mn2 = min(rank_merged["Real2025AvgDelta"].min(), rank_merged["DriverAvgDelta"].min())
-    mx2 = max(rank_merged["Real2025AvgDelta"].max(), rank_merged["DriverAvgDelta"].max())
-    fig_rank.add_trace(go.Scatter(x=[mn2,mx2],y=[mn2,mx2],mode="lines",
-        line=dict(color="#555",dash="dash"),name="Perfect ranking"))
-    fig_rank.update_layout(
-        paper_bgcolor="#0f0f0f", plot_bgcolor="#0f0f0f",
-        font=dict(color="#ccc",family="Titillium Web"),
-        xaxis=dict(title="Real 2025 Avg Delta (s)",gridcolor="#222"),
-        yaxis=dict(title="Predicted Avg Delta (s)",gridcolor="#222"),
-        showlegend=False,
-        height=420, margin=dict(l=0,r=0,t=10,b=40))
-    st.plotly_chart(fig_rank, use_container_width=True)
-    st.caption(f"Points closer to the diagonal = better ranking accuracy. "
-               f"Spearman r = {spear_r:.3f} — {rank_interpretation} rank correlation.")
-
-    # ── Error distribution ────────────────────────────────────────
-    st.markdown("---")
-    st.markdown("**📊 Error Distribution**")
-    col_err, col_sc = st.columns(2)
-    with col_err:
-        fig_h = go.Figure()
-        fig_h.add_trace(go.Histogram(x=acc["Error (s)"],nbinsx=40,
-            marker_color="#e10600",opacity=0.8,name="All drivers"))
-        # BUG FIX: filter team OUTSIDE cache, using current sel_team
-        team_acc_filtered = acc[acc["Team"]==sel_team]
-        if not team_acc_filtered.empty:
-            fig_h.add_trace(go.Histogram(x=team_acc_filtered["Error (s)"],nbinsx=20,
-                marker_color="#0066cc",opacity=0.9,name=sel_team))
-        fig_h.add_vline(x=0,line_color="#fff",line_dash="dash",
-            annotation_text="Perfect",annotation_position="top")
-        fig_h.add_vline(x=bias,line_color="#ff8c00",line_dash="dot",
-            annotation_text=f"Bias {bias:+.2f}s",annotation_position="bottom right")
-        fig_h.update_layout(barmode="overlay",paper_bgcolor="#0f0f0f",plot_bgcolor="#0f0f0f",
-            font=dict(color="#ccc",family="Titillium Web"),
-            xaxis=dict(title="Error (s)",gridcolor="#222"),
-            yaxis=dict(title="Count",gridcolor="#222"),
-            legend=dict(bgcolor="#1a1a2e"),
-            height=300,margin=dict(l=0,r=0,t=10,b=40))
-        st.plotly_chart(fig_err if False else fig_h, use_container_width=True)
-
-    with col_sc:
-        mn=acc["Real (s)"].min(); mx=acc["Real (s)"].max()
-        fig_sc = go.Figure()
-        fig_sc.add_trace(go.Scatter(x=[mn,mx],y=[mn,mx],mode="lines",
-            line=dict(color="#555",dash="dash"),name="Perfect"))
-        other = acc[acc["Team"]!=sel_team]
-        fig_sc.add_trace(go.Scatter(x=other["Real (s)"],y=other["Predicted (s)"],
-            mode="markers",marker=dict(size=4,color="#333",opacity=0.5),name="Other teams",
-            text=other["Driver"]+" · "+other["Race"],
-            hovertemplate="%{text}<br>Real:%{x:.3f}s<br>Pred:%{y:.3f}s<extra></extra>"))
-        if not team_acc_filtered.empty:
-            fig_sc.add_trace(go.Scatter(
-                x=team_acc_filtered["Real (s)"],y=team_acc_filtered["Predicted (s)"],
-                mode="markers",marker=dict(size=9,color="#e10600",opacity=0.9),name=sel_team,
-                text=team_acc_filtered["Driver"]+" · "+team_acc_filtered["Race"],
-                hovertemplate="%{text}<br>Real:%{x:.3f}s<br>Pred:%{y:.3f}s<extra></extra>"))
-        fig_sc.update_layout(paper_bgcolor="#0f0f0f",plot_bgcolor="#0f0f0f",
-            font=dict(color="#ccc",family="Titillium Web"),
-            xaxis=dict(title="Real (s)",gridcolor="#222"),
-            yaxis=dict(title="Predicted (s)",gridcolor="#222"),
-            legend=dict(bgcolor="#1a1a2e"),
-            height=300,margin=dict(l=0,r=0,t=10,b=40))
-        st.plotly_chart(fig_sc, use_container_width=True)
-
-    # ── MAE per race ──────────────────────────────────────────────
-    st.markdown("**🏁 MAE per Race**")
-    race_mae = acc.groupby("Race")["Abs Error"].mean().reset_index().sort_values("Abs Error")
-    fig_rm = px.bar(race_mae, x="Race", y="Abs Error",
-        color="Abs Error", color_continuous_scale=["#4CAF50","#ffcc00","#e10600"],
-        labels={"Abs Error":"MAE (s)","Race":""})
-    fig_rm.update_layout(paper_bgcolor="#0f0f0f",plot_bgcolor="#0f0f0f",
-        font=dict(color="#ccc",family="Titillium Web"),
-        coloraxis_showscale=False,
-        xaxis=dict(tickangle=-45,gridcolor="#222"),yaxis=dict(gridcolor="#222"),
-        height=300,margin=dict(l=0,r=0,t=10,b=110))
-    st.plotly_chart(fig_rm, use_container_width=True)
-
-    # ── Team detail table — BUG FIX: filter applied here, not in cache ──
-    st.markdown(f"**📋 {sel_team} — All 2025 Predictions vs Real**")
-    if not team_acc_filtered.empty:
-        show = team_acc_filtered[["Race","Driver","Real (s)","Predicted (s)","Error (s)","Abs Error"]].copy()
-        show = show.sort_values(["Race","Driver"])
-
-        def hl_err(row):
-            styles = [""] * len(row)
-            e = abs(row["Abs Error"])
-            styles[-1] = ("background-color:#003d00;color:#6bff6b" if e<=0.5
-                         else "background-color:#3d0000;color:#ff8888" if e>1.5 else "")
-            return styles
-
-        st.dataframe(show.style.apply(hl_err,axis=1),
-                     hide_index=True, use_container_width=True, height=500)
-    else:
-        st.info("No 2025 data available for this team.")
 
 # ─────────────────────────────────────────────
-# FOOTER
+# PAGE: ANALYSE
 # ─────────────────────────────────────────────
-st.markdown("---")
-st.markdown(
-    f"<div style='text-align:center;color:#444;font-size:12px'>"
-    f"F1 Qualifying Predictor · {sel_team} · 2025 Season · "
-    f"XGBoost on 2019–2024 best laps · Target: gap to pole · Rank r={spear_r:.3f}"
-    f"</div>", unsafe_allow_html=True)
+elif page == "analyse":
+    st.markdown("<div class='apple-page'>", unsafe_allow_html=True)
+    st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
+
+    # Sub-nav
+    sub = st.session_state.sub
+    sub_choice = st.radio("sub", ["Season","R&D","Accuracy"], horizontal=True,
+                           label_visibility="collapsed", key="sub_radio",
+                           index=["Season","R&D","Accuracy"].index(
+                               sub.capitalize() if sub.capitalize() in ["Season","R&d","Accuracy"]
+                               else "Season"
+                           ))
+    st.session_state.sub = sub_choice.lower()
+    sub = st.session_state.sub
+
+    # ────────────────────────────────
+    # SUB: SEASON
+    # ────────────────────────────────
+    if sub == "season":
+        st.markdown(f"<div class='apple-section-title'>{sel_team}</div>", unsafe_allow_html=True)
+        st.markdown("<div class='apple-section-sub'>Predicted performance across the 2025 calendar.</div>",
+                    unsafe_allow_html=True)
+
+        # Build season data
+        season_rows = []
+        for ev in ALL_EVENTS:
+            w = get_wx(ev)
+            for drv in [drv1,drv2]:
+                dlt = predict_delta(ev,sel_team,drv,"Q3","SOFT",2,True,w)
+                season_rows.append({"Race":ev,"Driver":drv,"Delta":round(dlt,3)})
+        sdf = pd.DataFrame(season_rows)
+
+        s1 = sdf[sdf["Driver"]==drv1]["Delta"]
+        s2 = sdf[sdf["Driver"]==drv2]["Delta"]
+        pivot = sdf.pivot(index="Race",columns="Driver",values="Delta").reset_index()
+        if drv1 in pivot.columns and drv2 in pivot.columns:
+            pivot["H2H"] = pivot[drv1] - pivot[drv2]
+            w1 = (pivot["H2H"]<0).sum(); w2 = (pivot["H2H"]>0).sum()
+            avg_gap = pivot["H2H"].abs().mean()
+        else:
+            w1=w2=0; avg_gap=0.0
+
+        # Metric cards
+        st.markdown(f"""
+        <div class='metric-grid'>
+          <div class='metric-card'>
+            <div class='metric-card-label' style='color:{d1_color}'>{drv1} avg gap</div>
+            <div class='metric-card-val'>+{s1.mean():.3f}s</div>
+            <div class='metric-card-sub'>to pole</div>
+          </div>
+          <div class='metric-card'>
+            <div class='metric-card-label' style='color:{d2_color}'>{drv2} avg gap</div>
+            <div class='metric-card-val'>+{s2.mean():.3f}s</div>
+            <div class='metric-card-sub'>to pole</div>
+          </div>
+          <div class='metric-card'>
+            <div class='metric-card-label'>{drv1} wins</div>
+            <div class='metric-card-val'>{w1} / {len(pivot)}</div>
+            <div class='metric-card-sub'>circuits</div>
+          </div>
+          <div class='metric-card'>
+            <div class='metric-card-label'>Intra-team avg</div>
+            <div class='metric-card-val'>{avg_gap:.3f}s</div>
+            <div class='metric-card-sub'>gap</div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Gap to pole — both drivers
+        st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+        st.markdown("<div class='chart-card-title'>Predicted gap to pole — all circuits</div>", unsafe_allow_html=True)
+        st.markdown("<div class='chart-card-sub'>Q3 · SOFT · historical weather</div>", unsafe_allow_html=True)
+        fig_s = go.Figure()
+        for drv,col in [(drv1,d1_color),(drv2,d2_color)]:
+            sd = sdf[sdf["Driver"]==drv]
+            fig_s.add_trace(go.Scatter(
+                x=sd["Race"], y=sd["Delta"], mode="lines+markers", name=drv,
+                line=dict(color=col,width=2), marker=dict(size=5,color=col),
+                hovertemplate="<b>%{x}</b><br>+%{y:.3f}s<extra></extra>"))
+        apple_layout(fig_s, 260)
+        fig_s.update_layout(xaxis=dict(tickangle=-40, tickfont=dict(size=10)))
+        fig_s.update_layout(legend=dict(orientation="h", y=1.08, x=0))
+        st.plotly_chart(fig_s, use_container_width=True, config={"displayModeBar":False})
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # H2H delta
+        if drv1 in pivot.columns and drv2 in pivot.columns:
+            st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+            st.markdown(f"<div class='chart-card-title'>Head-to-head gap per circuit</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='chart-card-sub'>Positive = {drv2} faster · Negative = {drv1} faster</div>", unsafe_allow_html=True)
+            ps = pivot.sort_values("H2H")
+            fig_h = go.Figure(go.Bar(
+                x=ps["Race"], y=ps["H2H"],
+                marker_color=[d2_color if v>0 else d1_color for v in ps["H2H"]],
+                hovertemplate="<b>%{x}</b><br>%{y:+.3f}s<extra></extra>"))
+            fig_h.add_hline(y=0, line_color="rgba(0,0,0,0.12)", line_width=1)
+            apple_layout(fig_h, 240)
+            fig_h.update_layout(xaxis=dict(tickangle=-40,tickfont=dict(size=10)))
+            st.plotly_chart(fig_h, use_container_width=True, config={"displayModeBar":False})
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        # Circuit type breakdown — two columns
+        ti_m = tracks[["Event","TrackType","LapSpeedClass"]].copy()
+        sf   = sdf.merge(ti_m, left_on="Race", right_on="Event", how="left")
+
+        col_a, col_b = st.columns(2)
+        for col, drv, color in [(col_a,drv1,d1_color),(col_b,drv2,d2_color)]:
+            with col:
+                sd = sf[sf["Driver"]==drv]
+                for grp, title, sub_t in [
+                    ("TrackType","Circuit type","Street vs Permanent"),
+                    ("LapSpeedClass","Speed class","Slow / Medium / Fast")
+                ]:
+                    by = sd.groupby(grp)["Delta"].mean().reset_index()
+                    st.markdown(f"<div class='chart-card'>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='chart-card-title' style='color:{color}'>{drv} · {title}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='chart-card-sub'>{sub_t}</div>", unsafe_allow_html=True)
+                    fig_t = go.Figure(go.Bar(
+                        x=by[grp], y=by["Delta"], marker_color=color,
+                        hovertemplate="%{x}<br>+%{y:.3f}s<extra></extra>"))
+                    apple_layout(fig_t, 180)
+                    st.plotly_chart(fig_t, use_container_width=True, config={"displayModeBar":False})
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+        # Historical trend
+        st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+        st.markdown("<div class='chart-card-title'>Historical team trend vs field</div>", unsafe_allow_html=True)
+        st.markdown("<div class='chart-card-sub'>Average qualifying lap time 2019–2024</div>", unsafe_allow_html=True)
+        push = df[df["IsPushLap"]==1]
+        yt = push[push["Team"]==sel_team].groupby("Year")["LapTime_sec"].mean().reset_index()
+        yf = push.groupby("Year")["LapTime_sec"].mean().reset_index()
+        fig_ht = go.Figure()
+        fig_ht.add_trace(go.Scatter(x=yt["Year"],y=yt["LapTime_sec"],mode="lines+markers",
+            name=sel_team,line=dict(color=d1_color,width=2.5),marker=dict(size=6)))
+        fig_ht.add_trace(go.Scatter(x=yf["Year"],y=yf["LapTime_sec"],mode="lines+markers",
+            name="Field average",line=dict(color="rgba(110,110,115,0.5)",width=1.5,dash="dot"),
+            marker=dict(size=5)))
+        apple_layout(fig_ht, 220)
+        fig_ht.update_layout(legend=dict(orientation="h",y=1.1,x=0))
+        st.plotly_chart(fig_ht, use_container_width=True, config={"displayModeBar":False})
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ────────────────────────────────
+    # SUB: R&D
+    # ────────────────────────────────
+    elif sub == "r&d":
+        st.markdown("<div class='apple-section-title'>R&D Simulator</div>", unsafe_allow_html=True)
+        st.markdown("<div class='apple-section-sub'>Simulate high vs low downforce setups across the calendar.</div>",
+                    unsafe_allow_html=True)
+
+        st.markdown("""
+        <div class='insight-card'>
+          <div class='insight-title'>How this works</div>
+          <div class='insight-body'>
+            Without raw telemetry, we use speed trap readings as a downforce proxy.
+            High downforce = more drag = slower straights. We shift trap speeds and measure
+            the resulting predicted gap-to-pole delta for each driver.
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        c1,c2 = st.columns(2)
+        with c1:
+            st.markdown("<div style='font-size:14px;font-weight:600;color:var(--c-text1);margin-bottom:8px'>High downforce</div>", unsafe_allow_html=True)
+            st.caption("Monaco · Singapore · Hungary")
+            df_pen  = st.slider("Straight speed loss (km/h)", 5,25,12,key="hd")
+        with c2:
+            st.markdown("<div style='font-size:14px;font-weight:600;color:var(--c-text1);margin-bottom:8px'>Low downforce</div>", unsafe_allow_html=True)
+            st.caption("Monza · Baku · Las Vegas")
+            df_gain = st.slider("Straight speed gain (km/h)", 5,25,12,key="ld")
+
+        sim_rows = []
+        for _, tr in tracks.iterrows():
+            ev = tr["Event"]
+            if ev not in df["Event"].values: continue
+            sc = str(tr.get("LapSpeedClass","Medium"))
+            si1,si2,sfl,sst = TRAP_MAP.get(sc,(265,250,240,278))
+            w = get_wx(ev)
+            for drv in [drv1,drv2]:
+                ds   = driver_skill[driver_skill["Driver"]==drv]
+                dd   = ds["DriverAvgDelta"].values[0] if not ds.empty else 1.5
+                tca2 = team_circuit_avg_delta[
+                    (team_circuit_avg_delta["Team"]==sel_team) &
+                    (team_circuit_avg_delta["TrackType"]==str(tr.get("TrackType","Permanent")))]
+                tc2  = tca2["TeamCircuitAvgDelta"].values[0] if not tca2.empty else 1.0
+
+                def pred_t(s1,s2,sf,ss,_drv=drv,_dd=dd,_tc=tc2,_ev=ev,_tr=tr,_w=w,_sc=sc):
+                    row={
+                        "Team_enc":safe_enc(le_team,sel_team),"Driver_enc":safe_enc(le_driver,_drv),
+                        "Event_enc":safe_enc(le_event,_ev),"Year":2025,
+                        "QualiSegment_num":3,"Compound_num":3,"TyreLife":2,"FreshTyre_int":1,
+                        "IsStreet":1 if str(_tr.get("TrackType","Permanent"))=="Street" else 0,
+                        "SpeedClass_num":SPEED_MAP.get(_sc,2),
+                        "DRSZones":_tr.get("DRSZones",2),"Altitude_m":_tr.get("Altitude_m",50),
+                        "NumCorners":_tr.get("NumCorners",15),"CornerDensity":_tr.get("CornerDensity",0.003),
+                        "TrackLength_m":_tr.get("TrackLength_m",5000),"AvgCornerSpacing_m":_tr.get("AvgCornerSpacing_m",333),
+                        "AirTemp":_w["AirTemp"],"TrackTemp":_w["TrackTemp"],"Humidity":_w["Humidity"],
+                        "Pressure":_w["Pressure"],"WindSpeed":_w["WindSpeed"],
+                        "Rainfall_int":1 if _w["Rainfall"]>0.1 else 0,
+                        "SpeedI1":s1,"SpeedI2":s2,"SpeedFL":sf,"SpeedST":ss,
+                        "TeamCircuitAvgDelta":_tc,"DriverAvgDelta":_dd,
+                    }
+                    return max(0.0,float(model.predict(pd.DataFrame([row])[features])[0]))
+
+                base = pred_t(si1,si2,sfl,sst)
+                hi   = pred_t(si1-df_pen, si2-df_pen, sfl,          sst-df_pen)
+                lo   = pred_t(si1+df_gain,si2+df_gain,sfl+df_gain,  sst+df_gain)
+                best_s = min(base,hi,lo)
+                sim_rows.append({"Circuit":ev,"Driver":drv,"SpeedClass":sc,
+                                 "Hi":round(hi-base,3),"Lo":round(lo-base,3),
+                                 "Best":"High DF" if best_s==hi else ("Low DF" if best_s==lo else "Balanced")})
+
+        sim_df = pd.DataFrame(sim_rows)
+
+        for drv,color in [(drv1,d1_color),(drv2,d2_color)]:
+            sd = sim_df[sim_df["Driver"]==drv]
+            hi_w = (sd["Hi"]<sd["Lo"]).sum(); lo_w = (sd["Lo"]<sd["Hi"]).sum()
+            rec  = "High downforce" if sd["Hi"].mean()<sd["Lo"].mean() else "Low downforce"
+
+            st.markdown(f"""
+            <div class='metric-grid' style='grid-template-columns:1fr 1fr 1fr;margin-top:16px'>
+              <div class='metric-card'>
+                <div class='metric-card-label' style='color:{color}'>{drv}</div>
+                <div class='metric-card-val'>{rec}</div>
+                <div class='metric-card-sub'>season recommendation</div>
+              </div>
+              <div class='metric-card'>
+                <div class='metric-card-label'>High DF wins</div>
+                <div class='metric-card-val'>{hi_w}</div>
+                <div class='metric-card-sub'>circuits</div>
+              </div>
+              <div class='metric-card'>
+                <div class='metric-card-label'>Low DF wins</div>
+                <div class='metric-card-val'>{lo_w}</div>
+                <div class='metric-card-sub'>circuits</div>
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+            st.markdown(f"<div class='chart-card-title' style='color:{color}'>{drv} — setup delta per circuit</div>", unsafe_allow_html=True)
+            st.markdown("<div class='chart-card-sub'>Negative = faster than baseline</div>", unsafe_allow_html=True)
+            fig_rd = go.Figure()
+            fig_rd.add_trace(go.Bar(name="High DF",x=sd["Circuit"],y=sd["Hi"],
+                marker_color=color,opacity=0.85))
+            fig_rd.add_trace(go.Bar(name="Low DF",x=sd["Circuit"],y=sd["Lo"],
+                marker_color="rgba(110,110,115,0.4)"))
+            fig_rd.add_hline(y=0,line_color="rgba(0,0,0,0.12)",line_width=1)
+            apple_layout(fig_rd, 220)
+            fig_rd.update_layout(barmode="group",
+                xaxis=dict(tickangle=-40,tickfont=dict(size=10)),
+                legend=dict(orientation="h",y=1.1,x=0))
+            st.plotly_chart(fig_rd, use_container_width=True, config={"displayModeBar":False})
+            st.markdown("</div>", unsafe_allow_html=True)
+
+    # ────────────────────────────────
+    # SUB: ACCURACY
+    # ────────────────────────────────
+    elif sub == "accuracy":
+        st.markdown("<div class='apple-section-title'>Model accuracy</div>", unsafe_allow_html=True)
+        st.markdown("<div class='apple-section-sub'>How well predictions matched the real 2025 qualifying results.</div>",
+                    unsafe_allow_html=True)
+
+        acc = compute_all_accuracy()
+        team_acc = acc[acc["Team"]==sel_team].copy()
+
+        full_mae  = acc["AbsError"].mean()
+        team_mae  = team_acc["AbsError"].mean() if not team_acc.empty else 0
+        within1   = (acc["AbsError"]<=1.0).mean()*100
+        bias      = acc["Error"].mean()
+
+        real_avg_delta = (real_2025
+            .assign(Pole=real_2025.groupby("race")["real_time_seconds"].transform("min"))
+            .assign(RealDelta=lambda x: x["real_time_seconds"]-x["Pole"])
+            .groupby("driver")["RealDelta"].mean().reset_index()
+            .rename(columns={"driver":"Driver","RealDelta":"Real2025AvgDelta"}))
+        drivers_both = [d for d in real_avg_delta["Driver"] if d in driver_skill["Driver"].values]
+        pred_d = driver_skill[driver_skill["Driver"].isin(drivers_both)][["Driver","DriverAvgDelta"]]
+        rm = real_avg_delta[real_avg_delta["Driver"].isin(drivers_both)].merge(pred_d,on="Driver")
+        spear_r, spear_p = spearmanr(rm["DriverAvgDelta"], rm["Real2025AvgDelta"])
+
+        # Key metric cards
+        st.markdown(f"""
+        <div class='metric-grid'>
+          <div class='metric-card'>
+            <div class='metric-card-label'>Ranking accuracy</div>
+            <div class='metric-card-val'>{spear_r:.2f}</div>
+            <div class='metric-card-sub'>Spearman r · p={spear_p:.3f}</div>
+          </div>
+          <div class='metric-card'>
+            <div class='metric-card-label'>MAE — all drivers</div>
+            <div class='metric-card-val'>{full_mae:.2f}s</div>
+            <div class='metric-card-sub'>avg absolute error</div>
+          </div>
+          <div class='metric-card'>
+            <div class='metric-card-label'>MAE — {sel_team}</div>
+            <div class='metric-card-val'>{team_mae:.2f}s</div>
+            <div class='metric-card-sub'>avg absolute error</div>
+          </div>
+          <div class='metric-card'>
+            <div class='metric-card-label'>Within 1 second</div>
+            <div class='metric-card-val'>{within1:.0f}%</div>
+            <div class='metric-card-sub'>of all predictions</div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Interpretation
+        rank_word = "strong" if spear_r>0.7 else ("moderate" if spear_r>0.5 else "weak")
+        bias_note = (f"over-predicts by {bias:.2f}s on average" if bias>0.2
+                     else f"under-predicts by {abs(bias):.2f}s on average" if bias<-0.2
+                     else "well-calibrated — no systematic bias")
+        st.markdown(f"""
+        <div class='insight-card'>
+          <div class='insight-title'>How to read these numbers</div>
+          <div class='insight-body'>
+            The most important metric is <span class='insight-highlight'>ranking accuracy (Spearman r = {spear_r:.2f})</span>.
+            This measures whether the model correctly orders drivers relative to each other — not whether absolute times are exact.
+            A score of {spear_r:.2f} represents {rank_word} rank correlation; random guessing would score 0.0.<br><br>
+            The model is <span class='insight-highlight'>{bias_note}</span>.
+            An MAE of {full_mae:.2f}s means predictions land within {full_mae:.2f} seconds of reality on average,
+            across {len(acc)} driver–race combinations in the full 2025 season.
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Ranking scatter
+        st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+        st.markdown("<div class='chart-card-title'>Ranking accuracy — predicted vs real delta from pole</div>", unsafe_allow_html=True)
+        st.markdown("<div class='chart-card-sub'>Points on the diagonal = perfect prediction. Coloured = your team.</div>", unsafe_allow_html=True)
+        rm["Team"] = rm["Driver"].map(DRIVER_TEAM_2025)
+        mn2=rm["Real2025AvgDelta"].min(); mx2=rm["Real2025AvgDelta"].max()
+        fig_rk = go.Figure()
+        fig_rk.add_trace(go.Scatter(x=[mn2,mx2],y=[mn2,mx2],mode="lines",
+            line=dict(color="rgba(110,110,115,0.3)",dash="dot",width=1.5),showlegend=False))
+        others = rm[rm["Team"]!=sel_team]
+        fig_rk.add_trace(go.Scatter(x=others["Real2025AvgDelta"],y=others["DriverAvgDelta"],
+            mode="markers+text", text=others["Driver"], textposition="top center",
+            textfont=dict(size=10,color="#86868b"),
+            marker=dict(size=8,color="rgba(110,110,115,0.25)",line=dict(color="rgba(110,110,115,0.5)",width=0.5)),
+            hovertemplate="%{text}<br>Real: %{x:.3f}s<br>Pred: %{y:.3f}s<extra></extra>",showlegend=False))
+        team_r = rm[rm["Team"]==sel_team]
+        if not team_r.empty:
+            fig_rk.add_trace(go.Scatter(x=team_r["Real2025AvgDelta"],y=team_r["DriverAvgDelta"],
+                mode="markers+text", text=team_r["Driver"], textposition="top center",
+                textfont=dict(size=11,color=d1_color,weight=600),
+                marker=dict(size=11,color=d1_color,line=dict(color="white",width=1.5)),
+                hovertemplate="%{text}<br>Real: %{x:.3f}s<br>Pred: %{y:.3f}s<extra></extra>",showlegend=False))
+        apple_layout(fig_rk, 340)
+        fig_rk.update_layout(xaxis=dict(title="Real 2025 avg gap to pole (s)"),
+                              yaxis=dict(title="Predicted avg gap (s)"))
+        st.plotly_chart(fig_rk, use_container_width=True, config={"displayModeBar":False})
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # MAE per race
+        st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+        st.markdown("<div class='chart-card-title'>Accuracy per race</div>", unsafe_allow_html=True)
+        st.markdown("<div class='chart-card-sub'>Average absolute error per Grand Prix</div>", unsafe_allow_html=True)
+        race_mae = acc.groupby("Race")["AbsError"].mean().reset_index().sort_values("AbsError")
+        fig_rm = go.Figure(go.Bar(
+            x=race_mae["Race"],y=race_mae["AbsError"],
+            marker_color=["#ff3b30" if v>2 else ("#ff9f0a" if v>1 else "#34c759") for v in race_mae["AbsError"]],
+            hovertemplate="%{x}<br>MAE: %{y:.3f}s<extra></extra>"))
+        apple_layout(fig_rm, 220)
+        fig_rm.update_layout(xaxis=dict(tickangle=-40,tickfont=dict(size=10)))
+        st.plotly_chart(fig_rm, use_container_width=True, config={"displayModeBar":False})
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # Team detail table
+        if not team_acc.empty:
+            st.markdown(f"<div class='grid-section-label' style='margin-top:24px'>{sel_team} — all 2025 predictions</div>",
+                        unsafe_allow_html=True)
+            rows_html = ""
+            for _, r in team_acc.sort_values(["Race","Driver"]).iterrows():
+                ec = "result-good" if r["AbsError"]<=0.5 else ("result-bad" if r["AbsError"]>1.5 else "")
+                clr = d1_color if r["Driver"]==drv1 else d2_color
+                rows_html += f"""
+                <div class='result-row'>
+                  <span style='font-size:13px;font-weight:600;color:{clr}'>{r['Driver']}</span>
+                  <span style='color:var(--c-text2);font-size:12px'>{r['Race'].replace(' Grand Prix','')}</span>
+                  <span style='color:var(--c-text1);font-variant-numeric:tabular-nums'>{secs_to_str(r['Real'])}</span>
+                  <span style='color:var(--c-text2);font-variant-numeric:tabular-nums'>{secs_to_str(r['Predicted'])}</span>
+                  <span class='{ec};font-variant-numeric:tabular-nums'>{r['Error']:+.3f}s</span>
+                </div>"""
+            st.markdown(f"""
+            <div class='result-table'>
+              <div class='result-row header'>
+                <span>Driver</span><span>Race</span><span>Real</span><span>Predicted</span><span>Error</span>
+              </div>
+              {rows_html}
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
