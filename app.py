@@ -22,41 +22,24 @@ st.set_page_config(
 # ─── Apple design system ───────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
-
-/* Apple font stack — SF Pro on Apple devices, Helvetica Neue elsewhere */
+/* Force light mode — Apple.com aesthetic */
 :root {
   --apple-font: -apple-system, BlinkMacSystemFont, "SF Pro Display",
                 "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
-  --c-bg:        #f5f5f7;
-  --c-surface:   #ffffff;
-  --c-surface2:  #f5f5f7;
-  --c-text1:     #1d1d1f;
-  --c-text2:     #6e6e73;
-  --c-text3:     #86868b;
-  --c-border:    rgba(0,0,0,0.08);
-  --c-blue:      #0071e3;
-  --c-blue-h:    #0077ed;
-  --c-red:       #ff3b30;
-  --c-green:     #34c759;
-  --c-divider:   rgba(0,0,0,0.1);
-  --r-sm:        8px;
-  --r-md:        12px;
-  --r-lg:        18px;
-  --r-xl:        22px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --c-bg:       #000000;
-    --c-surface:  #1c1c1e;
-    --c-surface2: #2c2c2e;
-    --c-text1:    #f5f5f7;
-    --c-text2:    #ababaf;
-    --c-text3:    #6e6e73;
-    --c-border:   rgba(255,255,255,0.08);
-    --c-divider:  rgba(255,255,255,0.1);
-  }
+  --c-bg:       #f5f5f7;
+  --c-surface:  #ffffff;
+  --c-surface2: #f5f5f7;
+  --c-text1:    #1d1d1f;
+  --c-text2:    #6e6e73;
+  --c-text3:    #86868b;
+  --c-border:   rgba(0,0,0,0.08);
+  --c-blue:     #0071e3;
+  --c-red:      #ff3b30;
+  --c-green:    #34c759;
+  --c-amber:    #ff9f0a;
+  --c-divider:  rgba(0,0,0,0.09);
+  --r-sm:  8px; --r-md: 12px; --r-lg: 18px; --r-xl: 22px;
+  color-scheme: light !important;
 }
 
 html, body, [class*="css"], [class*="st-"] {
@@ -77,19 +60,18 @@ html, body, [class*="css"], [class*="st-"] {
 /* ── Nav bar ── */
 .apple-nav {
   position: sticky; top: 0; z-index: 999;
-  background: rgba(245,245,247,0.85);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  border-bottom: 0.5px solid var(--c-divider);
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  border-bottom: 0.5px solid rgba(0,0,0,0.08);
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 24px; height: 52px;
+  padding: 0 28px; height: 54px;
+  max-width: 100%;
 }
-@media (prefers-color-scheme: dark) {
-  .apple-nav { background: rgba(0,0,0,0.85); }
-}
+
 .apple-nav-team {
-  font-size: 17px; font-weight: 600; color: var(--c-text1);
-  letter-spacing: -0.02em;
+  font-size: 15px; font-weight: 600; color: var(--c-text1);
+  letter-spacing: -0.01em;
 }
 .apple-nav-pills {
   display: flex; gap: 2px;
@@ -117,8 +99,8 @@ html, body, [class*="css"], [class*="st-"] {
 
 /* ── Section title ── */
 .apple-section-title {
-  font-size: 28px; font-weight: 600; color: var(--c-text1);
-  letter-spacing: -0.03em; margin: 44px 0 4px;
+  font-size: 36px; font-weight: 700; color: var(--c-text1);
+  letter-spacing: -0.04em; margin: 44px 0 4px;
 }
 .apple-section-sub {
   font-size: 15px; color: var(--c-text2); margin: 0 0 24px;
@@ -142,12 +124,13 @@ html, body, [class*="css"], [class*="st-"] {
   text-transform: uppercase; color: var(--c-text3); margin-bottom: 6px;
 }
 .driver-card-name {
-  font-size: 40px; font-weight: 700; letter-spacing: -0.04em;
-  color: var(--c-text1); margin-bottom: 20px; line-height: 1;
+  font-size: 52px; font-weight: 700; letter-spacing: -0.05em;
+  color: var(--c-text1); margin-bottom: 18px; line-height: 1;
 }
 .driver-card-time {
-  font-size: 28px; font-weight: 600; letter-spacing: -0.03em;
+  font-size: 32px; font-weight: 600; letter-spacing: -0.03em;
   color: var(--c-text1); margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
 }
 .driver-card-gap {
   font-size: 14px; color: var(--c-text2); margin-bottom: 16px;
@@ -208,7 +191,7 @@ html, body, [class*="css"], [class*="st-"] {
   border: 0.5px solid var(--c-border); padding: 16px 18px;
 }
 .metric-card-label { font-size: 12px; color: var(--c-text2); margin-bottom: 4px; }
-.metric-card-val { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--c-text1); }
+.metric-card-val { font-size: 24px; font-weight: 700; letter-spacing: -0.025em; color: var(--c-text1); }
 .metric-card-sub { font-size: 12px; color: var(--c-text3); margin-top: 2px; }
 
 /* ── Chart wrapper ── */
@@ -284,13 +267,16 @@ html, body, [class*="css"], [class*="st-"] {
 .team-btn-name { font-size: 15px; font-weight: 600; color: var(--c-text1); margin-bottom: 4px; }
 .team-btn-drivers { font-size: 13px; color: var(--c-text2); }
 
-/* ── Streamlit overrides ── */
+/* ── Streamlit overrides — force light ── */
+.stApp, [data-testid="stAppViewContainer"],
+[data-testid="stMain"], [data-testid="stVerticalBlock"],
+.main, .block-container { background: #f5f5f7 !important; color: #1d1d1f !important; }
 div[data-testid="stSelectbox"] > div > div {
-  background: var(--c-surface) !important;
-  border: 0.5px solid var(--c-border) !important;
+  background: #ffffff !important;
+  border: 0.5px solid rgba(0,0,0,0.1) !important;
   border-radius: var(--r-md) !important;
   font-size: 14px !important;
-  color: var(--c-text1) !important;
+  color: #1d1d1f !important;
 }
 div[data-testid="stSlider"] { padding: 0 !important; }
 div[data-testid="stCheckbox"] label { font-size: 14px !important; color: var(--c-text1) !important; }
@@ -489,31 +475,66 @@ if "wx_open" not in st.session_state: st.session_state.wx_open = False
 # TEAM SELECTION SCREEN
 # ─────────────────────────────────────────────
 if st.session_state.team is None:
+    # ── Hero headline ──────────────────────────────────────────────────────────
     st.markdown("""
-    <div style='max-width:640px;margin:0 auto;padding:80px 22px 40px;text-align:center;font-family:var(--apple-font)'>
-      <div style='font-size:13px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
-                  color:#86868b;margin-bottom:12px'>2025 Season</div>
-      <div style='font-size:52px;font-weight:700;letter-spacing:-0.04em;color:#1d1d1f;
-                  line-height:1.1;margin-bottom:16px'>
-        F1 Qualifying<br>Predictor
+    <div style='
+      max-width:980px; margin:0 auto; padding:90px 22px 0;
+      font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
+    '>
+      <div style='
+        font-size:11px; font-weight:600; letter-spacing:0.1em;
+        text-transform:uppercase; color:#86868b; margin-bottom:14px;
+      '>2025 Formula 1 Season</div>
+      <div style='
+        font-size:72px; font-weight:700; letter-spacing:-0.045em;
+        color:#1d1d1f; line-height:1.03; margin-bottom:18px;
+      '>Qualifying<br>Predictor.</div>
+      <div style='
+        font-size:21px; color:#6e6e73; font-weight:400;
+        letter-spacing:-0.01em; margin-bottom:56px; max-width:520px;
+      '>
+        Machine learning predictions for every team,
+        every circuit, every driver on the 2025 grid.
       </div>
-      <div style='font-size:19px;color:#6e6e73;margin-bottom:48px;font-weight:400'>
-        Select your team to get started.
-      </div>
+      <div style='
+        font-size:13px; font-weight:600; letter-spacing:0.05em;
+        text-transform:uppercase; color:#1d1d1f; margin-bottom:16px;
+      '>Select your team</div>
     </div>
     """, unsafe_allow_html=True)
 
+    # ── Team grid ──────────────────────────────────────────────────────────────
+    # Build HTML grid of team cards
+    cards_html = "<div style='max-width:980px;margin:0 auto;padding:0 22px 80px;font-family:-apple-system,BlinkMacSystemFont,\"Helvetica Neue\",Arial,sans-serif;display:grid;grid-template-columns:1fr 1fr;gap:10px;'>"
+    for team in TEAMS_2025:
+        d1, d2 = F1_2025_GRID[team]
+        tc = TEAM_COLORS.get(team, "#86868b")
+        cards_html += f"""
+        <div style='
+          background:#ffffff; border:0.5px solid rgba(0,0,0,0.08);
+          border-radius:18px; padding:22px 24px 20px;
+          cursor:pointer; transition:box-shadow 0.15s;
+          border-top:3px solid {tc};
+        '>
+          <div style='font-size:15px;font-weight:600;color:#1d1d1f;
+                      letter-spacing:-0.01em;margin-bottom:6px'>{team}</div>
+          <div style='font-size:22px;font-weight:700;color:#1d1d1f;
+                      letter-spacing:-0.02em;margin-bottom:4px'>{d1}</div>
+          <div style='font-size:22px;font-weight:700;color:#6e6e73;
+                      letter-spacing:-0.02em'>{d2}</div>
+        </div>"""
+    cards_html += "</div>"
+    st.markdown(cards_html, unsafe_allow_html=True)
+
+    # Streamlit buttons hidden under cards (invisible — just for click handling)
+    st.markdown("<div style='max-width:980px;margin:-220px auto 0;padding:0 22px;display:grid;grid-template-columns:1fr 1fr;gap:10px;opacity:0;'>", unsafe_allow_html=True)
     cols = st.columns(2)
     for i, team in enumerate(TEAMS_2025):
-        drv1, drv2 = F1_2025_GRID[team]
-        col = cols[i % 2]
-        tcolor = TEAM_COLORS.get(team, "#86868b")
-        with col:
-            if st.button(f"**{team}**\n\n{drv1}  ·  {drv2}",
-                         key=f"team_{team}", use_container_width=True):
+        with cols[i % 2]:
+            if st.button(team, key=f"team_{team}", use_container_width=True):
                 st.session_state.team = team
                 st.rerun()
-
+    st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
 # ─────────────────────────────────────────────
