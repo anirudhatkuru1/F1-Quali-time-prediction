@@ -605,20 +605,20 @@ if page == "predict":
     hist_wx = get_wx(sel_event)
     wx_label = f"🌡 {hist_wx['AirTemp']:.0f}°C · {hist_wx['TrackTemp']:.0f}°C track · {hist_wx['Humidity']:.0f}% humidity"
 
+    # defaults — overwritten inside expander if user opens it
+    wx = dict(**hist_wx)
     with st.expander(f"Weather conditions — {wx_label}", expanded=False):
-        wc1,wc2 = st.columns(2)
+        wc1, wc2 = st.columns(2)
         with wc1:
-            air_t   = st.slider("Air temp (°C)",   10,45, int(hist_wx["AirTemp"]),   key="wx_air")
-            track_t = st.slider("Track temp (°C)", 15,60, int(hist_wx["TrackTemp"]), key="wx_trk")
+            air_t   = st.slider("Air temp (°C)",   10, 45,  int(hist_wx["AirTemp"]),   key="wx_air")
+            track_t = st.slider("Track temp (°C)", 15, 60,  int(hist_wx["TrackTemp"]), key="wx_trk")
         with wc2:
-            hum  = st.slider("Humidity (%)",   10,100, int(hist_wx["Humidity"]),  key="wx_hum")
-            wind = st.slider("Wind (m/s)",     0,15,   int(hist_wx["WindSpeed"]), key="wx_wnd")
-            rain = st.checkbox("Rainfall",     value=hist_wx["Rainfall"]>0.1,     key="wx_rain")
+            hum  = st.slider("Humidity (%)", 10, 100, int(hist_wx["Humidity"]),  key="wx_hum")
+            wind = st.slider("Wind (m/s)",   0,  15,  int(hist_wx["WindSpeed"]), key="wx_wnd")
+            rain = st.checkbox("Rainfall",   value=hist_wx["Rainfall"] > 0.1,    key="wx_rain")
         wx = dict(AirTemp=air_t, TrackTemp=track_t, Humidity=hum,
                   WindSpeed=wind, Pressure=hist_wx["Pressure"],
                   Rainfall=1.0 if rain else 0.0)
-    else:
-        wx = hist_wx
 
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
