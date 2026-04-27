@@ -43,7 +43,6 @@ st.markdown("""
 }
 html, body, [class*="css"], [class*="st-"] {
   font-family: var(--f) !important;
-  color-scheme: light !important;
 }
 .stApp, [data-testid="stAppViewContainer"],
 [data-testid="stMain"], .main {
@@ -948,47 +947,79 @@ d2c = "#0071e3"
 page = st.session_state.page
 
 # ── Nav ──────────────────────────────────────────────────────────────────────
-p_on = "on" if page=="predict" else ""
-a_on = "on" if page=="analyse" else ""
+st.markdown("""<style>
+/* Hide all tab buttons from normal flow — we render them via HTML */
+div[data-testid="stColumns"] { display:none !important; }
+</style>""", unsafe_allow_html=True)
+
+# Invisible Streamlit buttons (used as click targets from HTML)
+tc1, tc2, tc3 = st.columns([2, 2, 2])
+with tc1:
+    st.button("__predict__", key="tab_predict", use_container_width=True)
+with tc2:
+    st.button("__analyse__", key="tab_analyse", use_container_width=True)
+with tc3:
+    st.button("__change__", key="tab_change", use_container_width=True)
+
+# Handle clicks
+if st.session_state.get("tab_predict"):
+    st.session_state.page = "predict"; st.rerun()
+if st.session_state.get("tab_analyse"):
+    st.session_state.page = "analyse"; st.rerun()
+if st.session_state.get("tab_change"):
+    st.session_state.team = None; st.session_state.screen = "selector"; st.rerun()
+
+# Full nav bar rendered as HTML — centered title + subtle side controls
+page_label = "Predict" if page == "predict" else "Analyse"
+other_label = "Analyse →" if page == "predict" else "← Predict"
+other_key   = "tab_analyse" if page == "predict" else "tab_predict"
 
 st.markdown(f"""
-<div class='app-nav'>
-  <span class='app-nav-left'>{sel_team}</span>
-  <div class='app-nav-pills'>
-    <button class='app-nav-pill {p_on}' id='np'>Predict</button>
-    <button class='app-nav-pill {a_on}' id='na'>Analyse</button>
-  </div>
-  <button class='app-nav-right' id='nc'>Change team</button>
+<style>
+.nav-bar {{
+  position: sticky; top: 0; z-index: 999;
+  background: rgba(10,10,10,0.96);
+  backdrop-filter: blur(20px);
+  border-bottom: 0.5px solid rgba(255,255,255,0.07);
+  height: 56px;
+  display: flex; align-items: center;
+  padding: 0 28px;
+  margin-bottom: 0;
+}}
+.nav-center {{
+  position: absolute; left: 50%; transform: translateX(-50%);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+  text-transform: uppercase; color: rgba(255,255,255,0.9);
+}}
+.nav-left {{
+  font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.35);
+  letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+}}
+.nav-right {{
+  margin-left: auto;
+  font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.35);
+  letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+}}
+.nav-dot {{ 
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #e10600; display: inline-block;
+}}
+</style>
+<div class='nav-bar'>
+  <span class='nav-left' onclick="(function(){{
+    var btns = window.parent.document.querySelectorAll('[data-testid=\\'stButton\\'] button');
+    btns.forEach(b => {{ if(b.textContent.trim()==='__change__') b.click(); }});
+  }})()">↩ Change team</span>
+  <span class='nav-center'><span class='nav-dot'></span>&nbsp;&nbsp;{page_label}</span>
+  <span class='nav-right' onclick="(function(){{
+    var btns = window.parent.document.querySelectorAll('[data-testid=\\'stButton\\'] button');
+    var key = '{other_key}';
+    btns.forEach(b => {{ if(b.textContent.trim()==='__{('analyse' if page == 'predict' else 'predict')}__') b.click(); }});
+  }})()">{other_label}</span>
 </div>
 """, unsafe_allow_html=True)
-
-# Hidden nav controls
-nav = st.selectbox("n", ["predict","analyse","change"],
-                   label_visibility="collapsed", key="nav_sel",
-                   index=["predict","analyse","change"].index(
-                       page if page in ["predict","analyse"] else "predict"))
-
-st.markdown("""<script>
-(function(){
-  function pick(v){
-    const sels=window.parent.document.querySelectorAll('[data-testid="stSelectbox"] select');
-    sels.forEach(s=>{for(let o of s.options){if(o.text===v||o.value===v){s.value=o.value;s.dispatchEvent(new Event('change',{bubbles:true}));break;}}});
-  }
-  setTimeout(()=>{
-    const np=window.parent.document.getElementById('np');
-    const na=window.parent.document.getElementById('na');
-    const nc=window.parent.document.getElementById('nc');
-    if(np) np.onclick=()=>pick('predict');
-    if(na) na.onclick=()=>pick('analyse');
-    if(nc) nc.onclick=()=>pick('change');
-  },300);
-})();
-</script>""", unsafe_allow_html=True)
-
-if nav=="change":
-    st.session_state.team=None; st.session_state.screen="selector"; st.rerun()
-elif nav!=page:
-    st.session_state.page=nav; st.rerun()
 
 # ════════════════════════════════════════
 # PREDICT PAGE
@@ -998,6 +1029,28 @@ if page == "predict":
     .stApp,[data-testid='stAppViewContainer'],[data-testid='stMain'],.main,.block-container{
       background:#0a0a0a !important;
     }
+    /* Hide selectbox labels visually but keep layout space intact */
+    div[data-testid='stSelectbox'] label {
+      visibility: hidden !important;
+      height: 0px !important;
+      min-height: 0px !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      font-size: 0 !important;
+      line-height: 0 !important;
+    }
+    /* Fix expander arrow overlapping the summary text */
+    div[data-testid='stExpander'] details summary {
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+    }
+    div[data-testid='stExpander'] details summary svg {
+      flex-shrink: 0 !important;
+      position: relative !important;
+      top: auto !important;
+      left: auto !important;
+    }
     div[data-testid='stExpander']{background:var(--sur) !important;border-color:var(--bdr) !important}
     div[data-testid='stExpander'] *{color:var(--t1) !important}
     div[data-testid='stSlider'] label{color:var(--t1) !important}
@@ -1005,29 +1058,17 @@ if page == "predict":
     label[data-testid='stWidgetLabel']{color:var(--t1) !important}
     .stSelectbox label, .stSlider label{color:var(--t1) !important}
     </style>""", unsafe_allow_html=True)
-    st.markdown("<div class='pg'>", unsafe_allow_html=True)
-
-    # Header with team name + change link
-    hc1, hc2 = st.columns([5,1])
-    with hc1:
-        st.markdown(f"<div style='padding:20px 0 8px;font-size:28px;font-weight:700;"
-                    f"letter-spacing:-0.03em;color:var(--t1)'>{sel_team}</div>",
-                    unsafe_allow_html=True)
-    with hc2:
-        if st.button("Change team", key="change_team_predict"):
-            st.session_state.team = None
-            st.session_state.screen = "selector"
-            st.rerun()
 
     c1,c2,c3 = st.columns([3,1,1])
-    with c1: sel_event = st.selectbox("e", ALL_EVENTS, key="pe", label_visibility="collapsed")
-    with c2: seg = st.selectbox("s", ["Q3","Q2","Q1"], key="ps", label_visibility="collapsed")
-    with c3: cmp = st.selectbox("c", ["SOFT","MEDIUM","HARD"], key="pc", label_visibility="collapsed")
-
+    with c1: sel_event = st.selectbox("Race", ALL_EVENTS, key="pe")
+    with c2: seg = st.selectbox("Session", ["Q3","Q2","Q1"], key="ps")
+    with c3: cmp = st.selectbox("Compound", ["SOFT","MEDIUM","HARD"], key="pc")
+     
     hist_wx = get_wx(sel_event)
     wx = dict(**hist_wx)
     wx_str = f"🌡 {hist_wx['AirTemp']:.0f}°C air · {hist_wx['TrackTemp']:.0f}°C track · {hist_wx['Humidity']:.0f}% humidity"
-    with st.expander(f"Weather — {wx_str}", expanded=False):
+    edit_wx = st.checkbox("Edit weather", key="wx_toggle")
+    if edit_wx:
         wc1,wc2 = st.columns(2)
         with wc1:
             at = st.slider("Air (°C)",   10,45, int(hist_wx["AirTemp"]),  key="wa")
@@ -1038,6 +1079,8 @@ if page == "predict":
             rn = st.checkbox("Rain", value=hist_wx["Rainfall"]>0.1, key="wr")
         wx = dict(AirTemp=at,TrackTemp=tt,Humidity=hm,WindSpeed=ws,
                   Pressure=hist_wx["Pressure"],Rainfall=1.0 if rn else 0.0)
+    else:
+        wx = dict(**hist_wx)
 
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
 
@@ -1053,9 +1096,12 @@ if page == "predict":
     pole_str = f"2025 pole: <b>{secs_to_str(pole_t)}</b>" if pole_t else ""
 
     st.markdown(f"""
+    <div style='font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;
+      color:rgba(255,255,255,0.25);margin-top:20px;margin-bottom:6px'>{sel_team}</div>
     <div style='font-size:13px;color:#86868b;margin-bottom:8px'>
       {ct} · {cs}&nbsp;&nbsp;&nbsp;{pole_str}
     </div>
+    
     <div class='dc-grid'>
       <div class='dc'>
         <div class='dc-eyebrow'>{sel_team}</div>
@@ -1154,6 +1200,7 @@ if page == "predict":
 # ANALYSE PAGE
 # ════════════════════════════════════════
 elif page == "analyse":
+    st.markdown(f"<div class='pg-title' style='margin-top:8px'>Analyse</div>", unsafe_allow_html=True)
     st.markdown("""<style>
     .stApp,[data-testid='stAppViewContainer'],[data-testid='stMain'],.main,.block-container{
       background:#0a0a0a !important;
@@ -1166,17 +1213,7 @@ elif page == "analyse":
     .stSelectbox label, .stSlider label{color:var(--t1) !important}
     </style>""", unsafe_allow_html=True)
     st.markdown("<div class='pg'>", unsafe_allow_html=True)
-    hca, hcb = st.columns([5,1])
-    with hca:
-        st.markdown(f"<div style='padding:20px 0 8px;font-size:28px;font-weight:700;"
-                    f"letter-spacing:-0.03em;color:var(--t1)'>{sel_team}</div>",
-                    unsafe_allow_html=True)
-    with hcb:
-        if st.button("Change team", key="change_team_analyse"):
-            st.session_state.team = None
-            st.session_state.screen = "selector"
-            st.rerun()
-
+        
     sub = st.session_state.sub
     sub_choice = st.radio("sub", ["Season","R&D","Accuracy"], horizontal=True,
                           label_visibility="collapsed", key="sub_r",
