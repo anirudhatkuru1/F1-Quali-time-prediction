@@ -50,7 +50,7 @@ html, body, [class*="css"], [class*="st-"] {
   background: #0a0a0a !important; color: #f5f5f7 !important;
 }
 .block-container { padding: 0 !important; max-width: 100% !important; }
-[data-testid="stVerticalBlock"] { gap: 0 !important; }
+[data-testid="stVerticalBlock"] { gap: 4px !important; }
 .stApp > header, #MainMenu, footer,
 .stDeployButton, [data-testid="stToolbar"],
 [data-testid="collapsedControl"],
@@ -245,6 +245,7 @@ section[data-testid="stSidebar"] { display: none !important; }
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-bottom: 0.5px solid var(--bdr);
+  margin-bottom: 8px;
 }
 .app-nav-left { font-size: 15px; font-weight: 600; color: var(--t1); letter-spacing: -0.01em; }
 .app-nav-pills {
@@ -271,8 +272,7 @@ section[data-testid="stSidebar"] { display: none !important; }
 .pg { max-width: 980px; margin: 0 auto; padding: 0 24px 80px; }
 
 /* ── Selector row ── */
-.sel-row { display: flex; gap: 10px; margin-bottom: 24px; margin-top: 28px; }
-
+.pg { max-width: 980px; margin: 0 auto; padding: 16px 24px 80px; }
 /* ── Driver hero cards ── */
 .dc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
 .dc {
@@ -283,7 +283,7 @@ section[data-testid="stSidebar"] { display: none !important; }
   background: #1a1a1a;
   transition: opacity 0.15s;
   width: 100%;
-  min-width: 0;cursor: inherit;  
+  min-width: 0;
 }
 .dc-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.07em;
   text-transform: uppercase; color: var(--t3); margin-bottom: 8px; }
@@ -577,35 +577,35 @@ _CAR = "/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRy
 
 _GRID = [
   {"team":"Red Bull Racing","tc":"#3671C6","d1":"VER","d2":"LAW","r1":"","r2":"",
-   "img1":"https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Max_Verstappen_2023_British_Grand_Prix_%28cropped%29.jpg/200px-Max_Verstappen_2023_British_Grand_Prix_%28cropped%29.jpg",
-   "img2":"https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Liam_Lawson%2C_2024_Singapore_GP.jpg/200px-Liam_Lawson%2C_2024_Singapore_GP.jpg"},
+   "img1":"https://www.formula1.com/content/dam/fom-website/drivers/M/MAXVER01_Max_Verstappen/maxver01.png",
+   "img2":"https://www.formula1.com/content/dam/fom-website/drivers/L/LIALAW01_Liam_Lawson/lialaw01.png"},
   {"team":"McLaren","tc":"#FF8000","d1":"NOR","d2":"PIA","r1":"","r2":"",
-   "img1":"https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/Lando_Norris_2023_British_Grand_Prix.jpg/200px-Lando_Norris_2023_British_Grand_Prix.jpg",
-   "img2":"https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Oscar_Piastri_2023_British_Grand_Prix_%28cropped%29.jpg/200px-Oscar_Piastri_2023_British_Grand_Prix_%28cropped%29.jpg"},
+   "img1":"https://www.formula1.com/content/dam/fom-website/drivers/L/LANNOR01_Lando_Norris/lannor01.png",
+   "img2":"https://www.formula1.com/content/dam/fom-website/drivers/O/OSCPIA01_Oscar_Piastri/oscpia01.png"},
   {"team":"Ferrari","tc":"#E8002D","d1":"LEC","d2":"HAM","r1":"","r2":"",
-   "img1":"https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Charles_Leclerc_2023_British_Grand_Prix_%28cropped%29.jpg/200px-Charles_Leclerc_2023_British_Grand_Prix_%28cropped%29.jpg",
-   "img2":"https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Lewis_Hamilton_2016_Malaysia_2_%28cropped%29.jpg/200px-Lewis_Hamilton_2016_Malaysia_2_%28cropped%29.jpg"},
+   "img1":"https://www.formula1.com/content/dam/fom-website/drivers/C/CHALEC01_Charles_Leclerc/chalec01.png",
+   "img2":"https://www.formula1.com/content/dam/fom-website/drivers/L/LEWHAM01_Lewis_Hamilton/lewham01.png"},
   {"team":"Mercedes","tc":"#27F4D2","d1":"RUS","d2":"ANT","r1":"","r2":"R",
-   "img1":"https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/George_Russell_2023_British_Grand_Prix_%28cropped%29.jpg/200px-George_Russell_2023_British_Grand_Prix_%28cropped%29.jpg",
-   "img2":"https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Kimi_Antonelli_2024_Italian_Grand_Prix_%28cropped%29.jpg/200px-Kimi_Antonelli_2024_Italian_Grand_Prix_%28cropped%29.jpg"},
+   "img1":"https://www.formula1.com/content/dam/fom-website/drivers/G/GEORUS01_George_Russell/georus01.png",
+   "img2":"https://www.formula1.com/content/dam/fom-website/drivers/A/ANDANT01_Andrea_Antonelli/andant01.png"},
   {"team":"Aston Martin","tc":"#229971","d1":"ALO","d2":"STR","r1":"","r2":"",
-   "img1":"https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Fernando_Alonso_2023_British_Grand_Prix_%28cropped%29.jpg/200px-Fernando_Alonso_2023_British_Grand_Prix_%28cropped%29.jpg",
-   "img2":"https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Lance_Stroll_2023_British_Grand_Prix_%28cropped%29.jpg/200px-Lance_Stroll_2023_British_Grand_Prix_%28cropped%29.jpg"},
+   "img1":"https://www.formula1.com/content/dam/fom-website/drivers/F/FERALO01_Fernando_Alonso/feralo01.png",
+   "img2":"https://www.formula1.com/content/dam/fom-website/drivers/L/LANSTR01_Lance_Stroll/lanstr01.png"},
   {"team":"Alpine","tc":"#FF87BC","d1":"GAS","d2":"DOO","r1":"","r2":"",
-   "img1":"https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Pierre_Gasly_2023_British_Grand_Prix_%28cropped%29.jpg/200px-Pierre_Gasly_2023_British_Grand_Prix_%28cropped%29.jpg",
-   "img2":"https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Jack_Doohan_2023_Macau_Grand_Prix_%28cropped%29.jpg/200px-Jack_Doohan_2023_Macau_Grand_Prix_%28cropped%29.jpg"},
+   "img1":"https://www.formula1.com/content/dam/fom-website/drivers/P/PIEGAS01_Pierre_Gasly/piegas01.png",
+   "img2":"https://www.formula1.com/content/dam/fom-website/drivers/J/JACDOO01_Jack_Doohan/jacdoo01.png"},
   {"team":"Haas F1 Team","tc":"#B6BABD","d1":"OCO","d2":"BEA","r1":"","r2":"",
-   "img1":"https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/Esteban_Ocon_2023_British_Grand_Prix_%28cropped%29.jpg/200px-Esteban_Ocon_2023_British_Grand_Prix_%28cropped%29.jpg",
-   "img2":"https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Oliver_Bearman_2024_British_Grand_Prix_%28cropped%29.jpg/200px-Oliver_Bearman_2024_British_Grand_Prix_%28cropped%29.jpg"},
+   "img1":"https://www.formula1.com/content/dam/fom-website/drivers/E/ESTOCO01_Esteban_Ocon/estoco01.png",
+   "img2":"https://www.formula1.com/content/dam/fom-website/drivers/O/OLIBEA01_Oliver_Bearman/olibea01.png"},
   {"team":"RB","tc":"#6692FF","d1":"TSU","d2":"HAD","r1":"","r2":"R",
-   "img1":"https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Yuki_Tsunoda_2023_British_Grand_Prix_%28cropped%29.jpg/200px-Yuki_Tsunoda_2023_British_Grand_Prix_%28cropped%29.jpg",
-   "img2":"https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Isack_Hadjar_2024_Silverstone_%28cropped%29.jpg/200px-Isack_Hadjar_2024_Silverstone_%28cropped%29.jpg"},
+   "img1":"https://www.formula1.com/content/dam/fom-website/drivers/Y/YUKTSU01_Yuki_Tsunoda/yuktsu01.png",
+   "img2":"https://www.formula1.com/content/dam/fom-website/drivers/I/ISAHAD01_Isack_Hadjar/isahad01.png"},
   {"team":"Williams","tc":"#64C4FF","d1":"ALB","d2":"SAI","r1":"","r2":"",
-   "img1":"https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Alexander_Albon_2023_British_Grand_Prix_%28cropped%29.jpg/200px-Alexander_Albon_2023_British_Grand_Prix_%28cropped%29.jpg",
-   "img2":"https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Carlos_Sainz_Jr_2023_British_Grand_Prix_%28cropped%29.jpg/200px-Carlos_Sainz_Jr_2023_British_Grand_Prix_%28cropped%29.jpg"},
+   "img1":"https://www.formula1.com/content/dam/fom-website/drivers/A/ALEALB01_Alexander_Albon/alealb01.png",
+   "img2":"https://www.formula1.com/content/dam/fom-website/drivers/C/CARSAI01_Carlos_Sainz/carsai01.png"},
   {"team":"Kick Sauber","tc":"#52E252","d1":"HUL","d2":"BOR","r1":"","r2":"R",
-   "img1":"https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Nico_H%C3%BClkenberg_2023_British_Grand_Prix_%28cropped%29.jpg/200px-Nico_H%C3%BClkenberg_2023_British_Grand_Prix_%28cropped%29.jpg",
-   "img2":"https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Gabriel_Bortoleto_2024_Zandvoort_%28cropped%29.jpg/200px-Gabriel_Bortoleto_2024_Zandvoort_%28cropped%29.jpg"},
+   "img1":"https://www.formula1.com/content/dam/fom-website/drivers/N/NICHUL01_Nico_Hulkenberg/nichul01.png",
+   "img2":"https://www.formula1.com/content/dam/fom-website/drivers/G/GABBOR01_Gabriel_Bortoleto/gabbor01.png"},
 ]
 _TEAMS = [g["team"] for g in _GRID]
 
@@ -718,7 +718,7 @@ def _selector_html():
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{background:#0d0d0d;min-height:100%}
+html,body{background:#0d0d0d;min-height:100%;height:100%}
 body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}
 /* ── title ── */
 .hdr{text-align:center;padding:44px 24px 32px;background:#0d0d0d}
@@ -726,7 +726,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}
   font-size:clamp(52px,8vw,96px);font-weight:900;
   color:#fff;text-transform:uppercase;letter-spacing:0.02em;line-height:1}
 /* ── grid container ── */
-.container {background: #0d0d0d;padding: 0 32px 60px;max-width: 1100px;margin: 0 auto;display: grid;grid-template-columns: 1fr 1fr;gap: 6px;}
+.container {background: #0d0d0d;padding: 0px 32px 60px;max-width: 1100px;margin: 0 auto;display: grid;grid-template-columns: 1fr 1fr;gap: 6px;}
   
 /* Each row = one team: 4-col grid (2 drivers, each with photo+name) */
 .team-row {display: grid; grid-template-columns: 1fr 1fr; gap: 0; cursor: pointer; border-radius: 6px; overflow: hidden;}
@@ -915,7 +915,7 @@ if st.session_state.screen == "selector":
     .app-nav{display:none !important;}
     </style>""", unsafe_allow_html=True)
 
-    components.html(_selector_html(), height=1200, scrolling=True)
+    components.html(_selector_html(), height=1950, scrolling=False)
 
     # Real Streamlit buttons (invisible) — back first, then teams in order
     if st.button("back", key="sb_back"):
