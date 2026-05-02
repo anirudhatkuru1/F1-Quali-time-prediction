@@ -567,6 +567,8 @@ def compute_all_accuracy():
 # ── SESSION STATE ────────────────────────────────────────────────────────────
 for k,v in [("screen","hero"),("team",None),("page","predict"),("sub","season")]:
     if k not in st.session_state: st.session_state[k] = v
+    
+page = st.session_state.get("page", "predict")
 
 import streamlit.components.v1 as components
 import json as _json
@@ -838,45 +840,6 @@ document.getElementById('backbtn').onclick = () => {
 # SCREEN 1: HERO
 # ════════════════════════════════════════════════════════════════════════════
 if st.session_state.screen == "hero":
-    st.markdown("""<style>
-    /* Kill every margin, padding, background that creates the colour strips */
-    html, body { margin:0 !important; padding:0 !important; overflow:hidden !important; background:#000 !important; }
-    .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"],
-    .main, .block-container, [data-testid="stVerticalBlock"],
-    [data-testid="stVerticalBlockBorderWrapper"],
-    [data-testid="stMainBlockContainer"],
-    [data-testid="stAppViewBlockContainer"],
-    section.main, .element-container, div.stMarkdown {
-      background:#000 !important;
-      padding:0 !important; margin:0 !important; gap:0 !important;
-      min-height:0 !important;
-    }
-    header, [data-testid="stHeader"], footer, #MainMenu,
-    [data-testid="stToolbar"], [data-testid="stDecoration"],
-    [data-testid="stStatusWidget"] {
-      display:none !important;
-    }
-    /* iframe must fill the full viewport with zero gaps */
-    iframe {
-      display:block !important; border:none !important;
-      width:100vw !important; height:100vh !important;
-      position:fixed !important; top:0 !important; left:0 !important;
-      z-index:1 !important;
-    }
-    /* Hidden full-page click catcher on top of iframe */
-    [data-testid="stButton"] {
-      position:fixed !important; inset:0 !important;
-      z-index:9999 !important; pointer-events:none !important;
-    }
-    [data-testid="stButton"] > button {
-      position:fixed !important; inset:0 !important;
-      width:100% !important; height:100% !important;
-      background:transparent !important; border:none !important;
-      color:transparent !important; font-size:1px !important;
-      cursor:default !important; pointer-events:none !important;
-    }
-    </style>""", unsafe_allow_html=True)
-
     components.html(_hero_html(), height=900, scrolling=False)
 
     if st.button("go", key="hero_go"):
@@ -953,21 +916,16 @@ div[data-testid="stColumns"] { display:none !important; }
 </style>""", unsafe_allow_html=True)
 
 # Invisible Streamlit buttons (used as click targets from HTML)
-tc1, tc2, tc3 = st.columns([2, 2, 2])
-with tc1:
-    st.button("__predict__", key="tab_predict", use_container_width=True)
-with tc2:
-    st.button("__analyse__", key="tab_analyse", use_container_width=True)
-with tc3:
-    st.button("__change__", key="tab_change", use_container_width=True)
-
-# Handle clicks
-if st.session_state.get("tab_predict"):
-    st.session_state.page = "predict"; st.rerun()
-if st.session_state.get("tab_analyse"):
-    st.session_state.page = "analyse"; st.rerun()
-if st.session_state.get("tab_change"):
-    st.session_state.team = None; st.session_state.screen = "selector"; st.rerun()
+col_pred, col_anal, col_change = st.columns([1, 1, 1])
+with col_pred:
+    if st.button("Predict", use_container_width=True, type="primary" if page=="predict" else "secondary", key="tab_predict"):
+        st.session_state.page = "predict"; st.rerun()
+with col_anal:
+    if st.button("Analyse", use_container_width=True, type="primary" if page=="analyse" else "secondary", key="tab_analyse"):
+        st.session_state.page = "analyse"; st.rerun()
+with col_change:
+    if st.button("↩ Change Team", use_container_width=True, key="tab_change"):
+        st.session_state.team = None; st.session_state.screen = "selector"; st.rerun()
 
 # Full nav bar rendered as HTML — centered title + subtle side controls
 page_label = "Predict" if page == "predict" else "Analyse"
@@ -1215,12 +1173,13 @@ elif page == "analyse":
     st.markdown("<div class='pg'>", unsafe_allow_html=True)
         
     sub = st.session_state.sub
-    sub_choice = st.radio("sub", ["Season","R&D","Accuracy"], horizontal=True,
+    _sub_map = {"season":"Season","r&d":"R&D","accuracy":"Accuracy"}
+    _sub_opts = ["Season","R&D","Accuracy"]
+    _sub_idx = _sub_opts.index(_sub_map.get(sub, "Season"))
+    sub_choice = st.radio("sub", _sub_opts, horizontal=True,
                           label_visibility="collapsed", key="sub_r",
-                          index=["Season","R&D","Accuracy"].index(
-                              sub.title() if sub.title() in ["Season","Accuracy"] else
-                              ("R&D" if sub=="r&d" else "Season")))
-    st.session_state.sub = sub_choice.lower()
+                          index=_sub_idx)
+    st.session_state.sub = sub_choice.lower().replace("r&d","r&d")
     sub = st.session_state.sub
 
     # ── SEASON ──────────────────────────────────
