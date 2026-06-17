@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>F1 Qualifying Predictor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #1a1a1a;
+    --border: #222222;
+    --text: #f0f0f0;
+    --muted: #666666;
+    --accent: #e10600;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'Inter',system-ui,sans-serif; overflow:hidden; height:100vh; }
+
+  /* ── SCREENS ── */
+  .screen { position:absolute; inset:0; display:flex; flex-direction:column; opacity:0; pointer-events:none; transition:opacity 0.6s ease, transform 0.6s ease; }
+  .screen.active { opacity:1; pointer-events:all; transform:translateY(0) !important; }
+  .screen.above { transform:translateY(-40px); }
+  .screen.below { transform:translateY(40px); }
+
+  /* ── SCREEN 1: WELCOME ── */
+  #s1 { justify-content:center; align-items:center; text-align:center; padding:60px; }
+  #s1 .badge { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--accent); margin-bottom:32px; }
+  #s1 h1 { font-size:clamp(48px,7vw,96px); font-weight:800; line-height:1; letter-spacing:-3px; margin-bottom:24px; }
+  #s1 h1 span { color:var(--accent); }
+  #s1 p { font-size:18px; color:var(--muted); max-width:520px; line-height:1.7; margin-bottom:52px; }
+  #s1 .stats-row { display:flex; gap:60px; margin-bottom:56px; }
+  #s1 .stat { text-align:center; }
+  #s1 .stat-num { font-size:36px; font-weight:800; color:var(--text); }
+  #s1 .stat-label { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-top:4px; }
+  .btn { display:inline-flex; align-items:center; gap:10px; background:var(--accent); color:#fff; border:none; padding:16px 36px; border-radius:4px; font-size:14px; font-weight:600; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
+  .btn:hover { background:#ff1a00; transform:translateY(-1px); }
+  .btn-ghost { background:transparent; border:1px solid var(--border); color:var(--muted); }
+  .btn-ghost:hover { border-color:var(--muted); color:var(--text); background:transparent; transform:none; }
+
+  /* ── SCREEN 2: TEAM SELECT ── */
+  #s2 { padding:48px 60px; overflow-y:auto; }
+  .screen-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:48px; flex-shrink:0; }
+  .screen-header h2 { font-size:28px; font-weight:700; letter-spacing:-1px; }
+  .screen-header p { color:var(--muted); font-size:14px; margin-top:4px; }
+  .teams-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; }
+  .team-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:28px 20px; cursor:pointer; transition:all 0.2s; text-align:center; position:relative; overflow:hidden; }
+  .team-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--team-color, #fff); }
+  .team-card:hover { border-color:var(--team-color, #fff); transform:translateY(-2px); background:var(--surface2); }
+  .team-name { font-size:13px; font-weight:700; letter-spacing:0.5px; margin-bottom:16px; }
+  .team-drivers { display:flex; flex-direction:column; gap:8px; }
+  .driver-pill { font-size:11px; color:var(--muted); background:var(--surface2); border-radius:3px; padding:5px 10px; display:flex; align-items:center; gap:8px; }
+  .driver-code { font-weight:800; font-size:13px; color:var(--text); }
+
+  /* ── SCREEN 3: PREDICTION ── */
+  #s3 { padding:48px 60px; overflow-y:auto; }
+  .pred-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:32px; }
+  .driver-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:32px; position:relative; overflow:hidden; }
+  .driver-card::before { content:''; position:absolute; top:0; left:0; bottom:0; width:3px; background:var(--team-color); }
+  .driver-card .d-code { font-size:48px; font-weight:900; letter-spacing:-2px; opacity:0.07; position:absolute; top:16px; right:20px; }
+  .driver-card .d-name { font-size:20px; font-weight:700; margin-bottom:4px; }
+  .driver-card .d-team { font-size:12px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:28px; }
+  .metrics-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:24px; }
+  .metric { background:var(--surface2); border-radius:6px; padding:16px; }
+  .metric-label { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+  .metric-value { font-size:24px; font-weight:800; }
+  .metric-value.good { color:#22c55e; }
+  .metric-value.warn { color:#f59e0b; }
+  .metric-value.bad  { color:#ef4444; }
+  .race-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .race-table th { text-align:left; padding:8px 12px; color:var(--muted); font-size:10px; letter-spacing:2px; text-transform:uppercase; border-bottom:1px solid var(--border); }
+  .race-table td { padding:10px 12px; border-bottom:1px solid #111; }
+  .race-table tr:last-child td { border:none; }
+  .pos-badge { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:4px; font-size:11px; font-weight:700; background:var(--surface2); }
+  .pos-badge.p1 { background:#f59e0b; color:#000; }
+  .pos-badge.p2 { background:#9ca3af; color:#000; }
+  .pos-badge.p3 { background:#cd7f32; color:#000; }
+
+  /* ── SCREEN 4: ANALYSIS ── */
+  #s4 { padding:48px 60px; overflow-y:auto; }
+  .analysis-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:24px; }
+  .chart-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:28px; }
+  .chart-card h3 { font-size:14px; font-weight:600; letter-spacing:0.5px; margin-bottom:20px; color:var(--muted); text-transform:uppercase; font-size:11px; letter-spacing:2px; }
+  .chart-wrap { position:relative; height:260px; }
+  .suggestions-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+  .suggestion-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:20px; }
+  .suggestion-card .priority { font-size:10px; letter-spacing:2px; text-transform:uppercase; margin-bottom:12px; font-weight:700; }
+  .priority.Critical { color:#ef4444; }
+  .priority.High     { color:#f59e0b; }
+  .priority.Medium   { color:#3b82f6; }
+  .priority.Low      { color:#6b7280; }
+  .suggestion-card h4 { font-size:14px; font-weight:700; margin-bottom:8px; }
+  .suggestion-card p  { font-size:12px; color:var(--muted); line-height:1.6; }
+
+  /* ── NAV ── */
+  .nav { position:fixed; bottom:40px; left:50%; transform:translateX(-50%); display:flex; gap:8px; z-index:100; background:rgba(10,10,10,0.8); backdrop-filter:blur(12px); padding:8px; border-radius:50px; border:1px solid var(--border); }
+  .nav-dot { width:8px; height:8px; border-radius:50%; background:var(--border); cursor:pointer; transition:all 0.3s; border:none; }
+  .nav-dot.active { background:var(--accent); width:24px; border-radius:4px; }
+
+  /* ── BACK BTN ── */
+  .back-btn { display:flex; align-items:center; gap:8px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:13px; transition:color 0.2s; padding:0; }
+  .back-btn:hover { color:var(--text); }
+  .team-badge { display:inline-flex; align-items:center; gap:10px; padding:6px 14px; border-radius:4px; font-size:12px; font-weight:700; letter-spacing:1px; }
+
+  /* ── LOADING ── */
+  .loading { display:flex; align-items:center; justify-content:center; height:200px; color:var(--muted); font-size:13px; letter-spacing:2px; }
+  .spinner { width:20px; height:20px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; margin-right:12px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width:4px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     SCREEN 1 — WELCOME
+══════════════════════════════════════════════ -->
+<div class="screen active above" id="s1">
+  <div class="badge">2025 Season · XGBoost + LightGBM Ensemble</div>
+  <h1>F1 Qualifying<br/><span>Predictor</span></h1>
+  <p>Machine learning model trained on 6 seasons of qualifying data. Predicts gap-to-pole using tyre strategy, weather, circuit DNA, and driver performance history.</p>
+  <div class="stats-row">
+    <div class="stat">
+      <div class="stat-num">0.28s</div>
+      <div class="stat-label">Mean Abs. Error</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">80.8%</div>
+      <div class="stat-label">Within 3 Positions</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">16,977</div>
+      <div class="stat-label">Training Laps</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">26</div>
+      <div class="stat-label">Features</div>
+    </div>
+  </div>
+  <button class="btn" onclick="goTo(2)">Select a Team &nbsp;→</button>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     SCREEN 2 — TEAM GRID
+══════════════════════════════════════════════ -->
+<div class="screen below" id="s2">
+  <div class="screen-header">
+    <div>
+      <h2>Select a Constructor</h2>
+      <p>2025 Formula 1 World Championship</p>
+    </div>
+    <button class="back-btn" onclick="goTo(1)">← Back</button>
+  </div>
+  <div class="teams-grid" id="teamsGrid">
+    <div class="loading"><div class="spinner"></div>Loading teams...</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     SCREEN 3 — PREDICTION
+══════════════════════════════════════════════ -->
+<div class="screen below" id="s3">
+  <div class="screen-header">
+    <div>
+      <h2 id="s3Title">Team Prediction</h2>
+      <p id="s3Sub">2025 Season Average · Gap to Pole Position</p>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <button class="back-btn" onclick="goTo(2)">← Teams</button>
+      <button class="btn" onclick="goTo(4)" id="analyzeBtn">Analyse Grid →</button>
+    </div>
+  </div>
+  <div id="predContent"><div class="loading"><div class="spinner"></div>Loading predictions...</div></div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     SCREEN 4 — ANALYSIS
+══════════════════════════════════════════════ -->
+<div class="screen below" id="s4">
+  <div class="screen-header">
+    <div>
+      <h2>Grid Analysis & R&D Insights</h2>
+      <p id="s4Sub">Season average comparison · All constructors</p>
+    </div>
+    <button class="back-btn" onclick="goTo(3)">← Prediction</button>
+  </div>
+  <div id="analysisContent"><div class="loading"><div class="spinner"></div>Loading analysis...</div></div>
+</div>
+
+<!-- ── NAV DOTS ── -->
+<nav class="nav">
+  <button class="nav-dot active" onclick="goTo(1)"></button>
+  <button class="nav-dot" onclick="goTo(2)"></button>
+  <button class="nav-dot" onclick="goTo(3)"></button>
+  <button class="nav-dot" onclick="goTo(4)"></button>
+</nav>
+
+<script>
+let currentScreen = 1;
+let selectedTeam  = null;
+let charts        = {};
+
+function goTo(n) {
+  const prev = document.getElementById(`s${currentScreen}`);
+  const next = document.getElementById(`s${n}`);
+  prev.classList.remove('active');
+  prev.classList.add(n > currentScreen ? 'above' : 'below');
+  next.classList.remove('above','below');
+  next.classList.add('active');
+  document.querySelectorAll('.nav-dot').forEach((d,i) => d.classList.toggle('active', i===n-1));
+  currentScreen = n;
+}
+
+// ── SCREEN 2: Load teams ──────────────────────────────────────
+async function loadTeams() {
+  const res   = await fetch('/api/teams');
+  const teams = await res.json();
+  const grid  = document.getElementById('teamsGrid');
+  grid.innerHTML = teams.map(t => `
+    <div class="team-card" style="--team-color:${t.color}" onclick="selectTeam('${t.name}')">
+      <div class="team-name">${t.name}</div>
+      <div class="team-drivers">
+        ${t.drivers.map(d => `
+          <div class="driver-pill">
+            <span class="driver-code">${d.code}</span>
+            <span>${d.name}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── SCREEN 3: Load prediction ────────────────────────────────
+async function selectTeam(team) {
+  selectedTeam = team;
+  goTo(3);
+  document.getElementById('s3Title').textContent = team;
+  document.getElementById('predContent').innerHTML = '<div class="loading"><div class="spinner"></div>Loading predictions...</div>';
+
+  const res  = await fetch(`/api/team/${team.replace(/ /g,'-')}`);
+  const data = await res.json();
+  renderPrediction(data);
+}
+
+function fmt(v) { return v >= 0 ? `+${v.toFixed(3)}s` : `${v.toFixed(3)}s`; }
+function errClass(e) { return e < 0.2 ? 'good' : e < 0.5 ? 'warn' : 'bad'; }
+function posClass(p) { return p===1?'p1':p===2?'p2':p===3?'p3':''; }
+
+function renderPrediction(data) {
+  const color = data.color;
+  const html  = `
+    <div class="pred-grid">
+      ${data.drivers.map(d => `
+        <div class="driver-card" style="--team-color:${color}">
+          <div class="d-code">${d.code}</div>
+          <div class="d-name">${d.name}</div>
+          <div class="d-team" style="color:${color}">${data.team}</div>
+          <div class="metrics-row">
+            <div class="metric">
+              <div class="metric-label">Predicted Gap</div>
+              <div class="metric-value">${fmt(d.avg_predicted)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Actual Gap</div>
+              <div class="metric-value">${fmt(d.avg_actual)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Model Error</div>
+              <div class="metric-value ${errClass(d.avg_error)}">${d.avg_error.toFixed(3)}s</div>
+            </div>
+          </div>
+          <div class="metrics-row">
+            <div class="metric">
+              <div class="metric-label">Pred. Position</div>
+              <div class="metric-value">P${Math.round(d.avg_pred_pos)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Actual Position</div>
+              <div class="metric-value">P${Math.round(d.avg_actual_pos)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Races Analysed</div>
+              <div class="metric-value">${d.races.length}</div>
+            </div>
+          </div>
+          <table class="race-table">
+            <thead>
+              <tr>
+                <th>Race</th>
+                <th>Predicted</th>
+                <th>Actual</th>
+                <th>Error</th>
+                <th>Pred P</th>
+                <th>Real P</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${d.races.map(r => `
+                <tr>
+                  <td style="color:var(--muted)">${r.race.replace(' Grand Prix','')}</td>
+                  <td>${fmt(r.predicted)}</td>
+                  <td>${fmt(r.actual)}</td>
+                  <td style="color:${r.error<0.2?'#22c55e':r.error<0.5?'#f59e0b':'#ef4444'}">${r.error.toFixed(3)}s</td>
+                  <td><span class="pos-badge ${posClass(r.pred_pos)}">${r.pred_pos}</span></td>
+                  <td><span class="pos-badge ${posClass(r.actual_pos)}">${r.actual_pos}</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  document.getElementById('predContent').innerHTML = html;
+}
+
+// ── SCREEN 4: Analysis ────────────────────────────────────────
+async function loadAnalysis() {
+  if (!selectedTeam) return;
+  document.getElementById('s4Sub').textContent = `${selectedTeam} · Season average comparison`;
+  document.getElementById('analysisContent').innerHTML = '<div class="loading"><div class="spinner"></div>Loading analysis...</div>';
+
+  const res  = await fetch(`/api/grid/${selectedTeam.replace(/ /g,'-')}`);
+  const data = await res.json();
+  renderAnalysis(data);
+}
+
+function renderAnalysis(data) {
+  const html = `
+    <div class="analysis-grid">
+      <div class="chart-card">
+        <h3>Predicted vs Actual Gap to Pole — All Drivers</h3>
+        <div class="chart-wrap"><canvas id="gridChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Constructor Average Gap to Pole</h3>
+        <div class="chart-wrap"><canvas id="teamChart"></canvas></div>
+      </div>
+    </div>
+    <div class="suggestions-grid">
+      ${data.suggestions.map(s => `
+        <div class="suggestion-card">
+          <div class="priority ${s.priority}">${s.priority}</div>
+          <h4>${s.area}</h4>
+          <p>${s.detail}</p>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  document.getElementById('analysisContent').innerHTML = html;
+
+  // Destroy old charts
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+
+  // Chart 1: Driver bar chart
+  const sorted = [...data.grid].sort((a,b) => a.actual - b.actual);
+  charts.grid = new Chart(document.getElementById('gridChart'), {
+    type: 'bar',
+    data: {
+      labels: sorted.map(d => d.driver),
+      datasets: [
+        {
+          label: 'Actual',
+          data: sorted.map(d => d.actual),
+          backgroundColor: sorted.map(d => d.is_selected ? d.color : d.color + '55'),
+          borderColor: sorted.map(d => d.color),
+          borderWidth: sorted.map(d => d.is_selected ? 2 : 1),
+          borderRadius: 3,
+        },
+        {
+          label: 'Predicted',
+          data: sorted.map(d => d.predicted),
+          backgroundColor: 'transparent',
+          borderColor: sorted.map(d => d.color),
+          borderWidth: 1,
+          borderDash: [4,4],
+          type: 'line',
+          pointRadius: 3,
+          pointBackgroundColor: sorted.map(d => d.color),
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color:'#666', font:{size:11} } } },
+      scales: {
+        x: { ticks:{color:'#666',font:{size:10}}, grid:{color:'#1a1a1a'} },
+        y: { ticks:{color:'#666',font:{size:10},callback:v=>`+${v.toFixed(2)}s`}, grid:{color:'#1a1a1a'} }
+      }
+    }
+  });
+
+  // Chart 2: Team bar chart
+  charts.team = new Chart(document.getElementById('teamChart'), {
+    type: 'bar',
+    data: {
+      labels: data.teams_chart.map(t => t.team.replace('Racing','').replace('Red Bull','RBR').trim()),
+      datasets: [
+        {
+          label: 'Actual',
+          data: data.teams_chart.map(t => t.actual),
+          backgroundColor: data.teams_chart.map(t => t.is_selected ? t.color : t.color+'55'),
+          borderColor: data.teams_chart.map(t => t.color),
+          borderWidth: data.teams_chart.map(t => t.is_selected ? 2 : 1),
+          borderRadius: 3,
+        },
+        {
+          label: 'Predicted',
+          data: data.teams_chart.map(t => t.predicted),
+          backgroundColor: 'transparent',
+          borderColor: data.teams_chart.map(t => t.color),
+          borderWidth: 1,
+          type: 'line',
+          pointRadius: 4,
+          pointBackgroundColor: data.teams_chart.map(t => t.color),
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color:'#666', font:{size:11} } } },
+      scales: {
+        x: { ticks:{color:'#666',font:{size:10},maxRotation:30}, grid:{color:'#1a1a1a'} },
+        y: { ticks:{color:'#666',font:{size:10},callback:v=>`+${v.toFixed(2)}s`}, grid:{color:'#1a1a1a'} }
+      }
+    }
+  });
+}
+
+// Override goTo to trigger data load
+const _goTo = goTo;
+goTo = function(n) {
+  _goTo(n);
+  if (n === 4) loadAnalysis();
+};
+
+// Init
+loadTeams();
+</script>
+</body>
+</html>
