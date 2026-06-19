@@ -22,9 +22,9 @@ print("=" * 60)
 # ─────────────────────────────────────────────────────────────
 # 1. LOAD & REBUILD FEATURES
 # ─────────────────────────────────────────────────────────────
-raw    = pd.read_csv("data/data.csv")
-real25 = pd.read_csv("data/real_lap_time_2025.csv")
-tracks = pd.read_csv("data/tracks.csv")
+raw    = pd.read_csv("Data/data.csv")
+real25 = pd.read_csv("Data/real_lap_time_2025.csv")
+tracks = pd.read_csv("Data/tracks.csv")
 
 TEAM_MAP = {
     "Alfa Romeo Racing": "Alfa Romeo", "AlphaTauri": "RB", "Toro Rosso": "RB",
@@ -155,7 +155,7 @@ MODEL_FEATURES = [
 # ─────────────────────────────────────────────────────────────
 # 5. FIX 2: BUILD 2025 TRAINING ROWS
 # ─────────────────────────────────────────────────────────────
-raw2025_train = pd.read_csv("data/data_2025.csv")
+raw2025_train = pd.read_csv("Data/data_2025.csv")
 raw2025_train["Team"] = raw2025_train["Team"].replace(TEAM_MAP)
 raw2025_train = raw2025_train[raw2025_train["IsPushLap"] == 1].copy()
 
@@ -388,7 +388,7 @@ def to_bool_int(series):
               .fillna(0).astype(int)
     )
 
-raw2025 = pd.read_csv("data/data_2025.csv")
+raw2025 = pd.read_csv("Data/data_2025.csv")
 raw2025["Team"] = raw2025["Team"].replace(TEAM_MAP)
 raw2025 = raw2025[raw2025["IsPushLap"] == 1].copy()
 

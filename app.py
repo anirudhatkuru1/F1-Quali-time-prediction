@@ -10,8 +10,8 @@ model_xgb     = pickle.load(open("model/model_xgb.pkl", "rb"))
 model_lgb     = pickle.load(open("model/model_lgb.pkl", "rb"))
 results_df    = pd.read_csv("model/model_results.csv")
 importance_df = pd.read_csv("model/feature_importance.csv")
-real25        = pd.read_csv("data/real_lap_time_2025.csv")
-tracks        = pd.read_csv("data/tracks.csv")
+real25        = pd.read_csv("Data/real_lap_time_2025.csv")
+tracks        = pd.read_csv("Data/tracks.csv")
 
 TEAM_MAP = {
     "Alfa Romeo Racing": "Alfa Romeo", "AlphaTauri": "RB", "Toro Rosso": "RB",
