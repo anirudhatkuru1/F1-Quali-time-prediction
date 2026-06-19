@@ -454,7 +454,7 @@ function renderRace(data){
             <div class="metric">
               <div class="metric-label">Position Delta</div>
               <div class="metric-value ${Math.abs(d.pred_pos-d.actual_pos)<=2?'good':Math.abs(d.pred_pos-d.actual_pos)<=4?'warn':'bad'}">
-                ${d.pred_pos===d.actual_pos?'✓ Exact':`${Math.abs(d.pred_pos-d.actual_pos)} off`}
+                ${d.pred_pos===d.actual_pos?'Exact':`${Math.abs(d.pred_pos-d.actual_pos)} off`}
               </div>
             </div>
           </div>
