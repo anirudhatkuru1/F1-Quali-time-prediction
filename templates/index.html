@@ -6,192 +6,263 @@
 <title>F1 Qualifying Predictor</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-  :root {
-    --bg: #0a0a0a;
-    --surface: #111111;
-    --surface2: #1a1a1a;
-    --border: #222222;
-    --text: #f0f0f0;
-    --muted: #666666;
-    --accent: #e10600;
-  }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--bg); color:var(--text); font-family:'Inter',system-ui,sans-serif; overflow:hidden; height:100vh; }
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#060608;--accent:#e10600;--accent2:#ff4433;
+  --glass-bg:rgba(255,255,255,0.04);--glass-border:rgba(255,255,255,0.10);
+  --glass-shine:rgba(255,255,255,0.06);--text:#f0f0f0;
+  --muted:rgba(255,255,255,0.4);--muted2:rgba(255,255,255,0.2);
+}
+body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;overflow:hidden;height:100vh;width:100vw;}
+.bg-canvas{position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse 80% 60% at 20% 20%,rgba(225,6,0,0.08) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 80% 80%,rgba(54,113,198,0.06) 0%,transparent 60%);}
+.bg-grid{position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 100% 100% at 50% 50%,black 30%,transparent 100%);}
 
-  /* ── SCREENS ── */
-  .screen { position:absolute; inset:0; display:flex; flex-direction:column; opacity:0; pointer-events:none; transition:opacity 0.6s ease, transform 0.6s ease; }
-  .screen.active { opacity:1; pointer-events:all; transform:translateY(0) !important; }
-  .screen.above { transform:translateY(-40px); }
-  .screen.below { transform:translateY(40px); }
+.screen{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity 0.5s ease,transform 0.5s ease;overflow:hidden;}
+.screen.active{opacity:1;pointer-events:all;transform:translateY(0) !important;}
+.screen.above{transform:translateY(-30px);}
+.screen.below{transform:translateY(30px);}
+.screen-body{flex:1;overflow-y:auto;padding:0 52px 100px;}
+.screen-body::-webkit-scrollbar{width:3px;}
+.screen-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px;}
 
-  /* ── SCREEN 1: WELCOME ── */
-  #s1 { justify-content:center; align-items:center; text-align:center; padding:60px; }
-  #s1 .badge { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--accent); margin-bottom:32px; }
-  #s1 h1 { font-size:clamp(48px,7vw,96px); font-weight:800; line-height:1; letter-spacing:-3px; margin-bottom:24px; }
-  #s1 h1 span { color:var(--accent); }
-  #s1 p { font-size:18px; color:var(--muted); max-width:520px; line-height:1.7; margin-bottom:52px; }
-  #s1 .stats-row { display:flex; gap:60px; margin-bottom:56px; }
-  #s1 .stat { text-align:center; }
-  #s1 .stat-num { font-size:36px; font-weight:800; color:var(--text); }
-  #s1 .stat-label { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-top:4px; }
-  .btn { display:inline-flex; align-items:center; gap:10px; background:var(--accent); color:#fff; border:none; padding:16px 36px; border-radius:4px; font-size:14px; font-weight:600; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
-  .btn:hover { background:#ff1a00; transform:translateY(-1px); }
-  .btn-ghost { background:transparent; border:1px solid var(--border); color:var(--muted); }
-  .btn-ghost:hover { border-color:var(--muted); color:var(--text); background:transparent; transform:none; }
+.glass{background:var(--glass-bg);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:16px;position:relative;overflow:hidden;}
+.glass::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--glass-shine) 0%,transparent 50%);pointer-events:none;border-radius:inherit;}
 
-  /* ── SCREEN 2: TEAM SELECT ── */
-  #s2 { padding:48px 60px; overflow-y:auto; }
-  .screen-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:48px; flex-shrink:0; }
-  .screen-header h2 { font-size:28px; font-weight:700; letter-spacing:-1px; }
-  .screen-header p { color:var(--muted); font-size:14px; margin-top:4px; }
-  .teams-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; }
-  .team-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:28px 20px; cursor:pointer; transition:all 0.2s; text-align:center; position:relative; overflow:hidden; }
-  .team-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--team-color, #fff); }
-  .team-card:hover { border-color:var(--team-color, #fff); transform:translateY(-2px); background:var(--surface2); }
-  .team-name { font-size:13px; font-weight:700; letter-spacing:0.5px; margin-bottom:16px; }
-  .team-drivers { display:flex; flex-direction:column; gap:8px; }
-  .driver-pill { font-size:11px; color:var(--muted); background:var(--surface2); border-radius:3px; padding:5px 10px; display:flex; align-items:center; gap:8px; }
-  .driver-code { font-weight:800; font-size:13px; color:var(--text); }
+/* S1 */
+#s1{justify-content:center;align-items:center;text-align:center;}
+.speed-lines{position:absolute;inset:0;overflow:hidden;pointer-events:none;}
+.speed-line{position:absolute;left:-200px;height:1px;background:linear-gradient(90deg,transparent,rgba(225,6,0,0.6),transparent);animation:speedline 3s ease-in-out infinite;opacity:0;}
+@keyframes speedline{0%{opacity:0;transform:translateX(0);}10%{opacity:1;}90%{opacity:0.5;}100%{opacity:0;transform:translateX(120vw);}}
+.s1-inner{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;}
+.s1-eyebrow{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--accent);margin-bottom:28px;display:flex;align-items:center;gap:12px;}
+.s1-eyebrow::before,.s1-eyebrow::after{content:'';display:block;width:40px;height:1px;background:var(--accent);opacity:0.5;}
+.s1-title{font-size:clamp(56px,8vw,110px);font-weight:900;line-height:0.9;letter-spacing:-4px;margin-bottom:8px;}
+.s1-title .red{color:var(--accent);text-shadow:0 0 60px rgba(225,6,0,0.5),0 0 120px rgba(225,6,0,0.2);}
+.s1-title .white{color:#fff;}
+.s1-sub{font-size:15px;color:var(--muted);max-width:440px;line-height:1.7;margin:28px 0 48px;}
+.s1-glass-card{padding:40px 56px;display:flex;flex-direction:column;align-items:center;gap:32px;max-width:520px;width:100%;}
+.s1-btn{display:inline-flex;align-items:center;gap:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;padding:16px 40px;border-radius:50px;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;box-shadow:0 0 40px rgba(225,6,0,0.4),0 0 80px rgba(225,6,0,0.15);transition:all 0.3s;animation:pulse-btn 2.5s ease-in-out infinite;}
+@keyframes pulse-btn{0%,100%{box-shadow:0 0 40px rgba(225,6,0,0.4),0 0 80px rgba(225,6,0,0.15);}50%{box-shadow:0 0 60px rgba(225,6,0,0.7),0 0 120px rgba(225,6,0,0.3);}}
+.s1-btn:hover{transform:scale(1.04);animation:none;}
+.s1-chips{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+.chip{padding:8px 16px;border-radius:50px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);font-size:11px;color:var(--muted);letter-spacing:1px;}
+.chip b{color:var(--text);}
 
-  /* ── SCREEN 3: PREDICTION ── */
-  #s3 { padding:48px 60px; overflow-y:auto; }
-  .pred-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:32px; }
-  .driver-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:32px; position:relative; overflow:hidden; }
-  .driver-card::before { content:''; position:absolute; top:0; left:0; bottom:0; width:3px; background:var(--team-color); }
-  .driver-card .d-code { font-size:48px; font-weight:900; letter-spacing:-2px; opacity:0.07; position:absolute; top:16px; right:20px; }
-  .driver-card .d-name { font-size:20px; font-weight:700; margin-bottom:4px; }
-  .driver-card .d-team { font-size:12px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:28px; }
-  .metrics-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:24px; }
-  .metric { background:var(--surface2); border-radius:6px; padding:16px; }
-  .metric-label { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
-  .metric-value { font-size:24px; font-weight:800; }
-  .metric-value.good { color:#22c55e; }
-  .metric-value.warn { color:#f59e0b; }
-  .metric-value.bad  { color:#ef4444; }
-  .race-table { width:100%; border-collapse:collapse; font-size:13px; }
-  .race-table th { text-align:left; padding:8px 12px; color:var(--muted); font-size:10px; letter-spacing:2px; text-transform:uppercase; border-bottom:1px solid var(--border); }
-  .race-table td { padding:10px 12px; border-bottom:1px solid #111; }
-  .race-table tr:last-child td { border:none; }
-  .pos-badge { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:4px; font-size:11px; font-weight:700; background:var(--surface2); }
-  .pos-badge.p1 { background:#f59e0b; color:#000; }
-  .pos-badge.p2 { background:#9ca3af; color:#000; }
-  .pos-badge.p3 { background:#cd7f32; color:#000; }
+/* HEADER */
+.s-header{padding:36px 52px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.s-header-left h2{font-size:24px;font-weight:800;letter-spacing:-0.5px;}
+.s-header-left p{font-size:13px;color:var(--muted);margin-top:4px;}
+.back-btn{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);color:var(--muted);cursor:pointer;font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:10px 20px;border-radius:50px;transition:all 0.2s;backdrop-filter:blur(12px);}
+.back-btn:hover{color:var(--text);background:rgba(255,255,255,0.08);}
+.action-btn{display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;cursor:pointer;font-size:12px;letter-spacing:1px;text-transform:uppercase;font-weight:700;padding:12px 28px;border-radius:50px;box-shadow:0 0 24px rgba(225,6,0,0.35);transition:all 0.2s;}
+.action-btn:hover{transform:translateY(-1px);box-shadow:0 0 40px rgba(225,6,0,0.55);}
 
-  /* ── SCREEN 4: ANALYSIS ── */
-  #s4 { padding:48px 60px; overflow-y:auto; }
-  .analysis-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:24px; }
-  .chart-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:28px; }
-  .chart-card h3 { font-size:14px; font-weight:600; letter-spacing:0.5px; margin-bottom:20px; color:var(--muted); text-transform:uppercase; font-size:11px; letter-spacing:2px; }
-  .chart-wrap { position:relative; height:260px; }
-  .suggestions-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
-  .suggestion-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:20px; }
-  .suggestion-card .priority { font-size:10px; letter-spacing:2px; text-transform:uppercase; margin-bottom:12px; font-weight:700; }
-  .priority.Critical { color:#ef4444; }
-  .priority.High     { color:#f59e0b; }
-  .priority.Medium   { color:#3b82f6; }
-  .priority.Low      { color:#6b7280; }
-  .suggestion-card h4 { font-size:14px; font-weight:700; margin-bottom:8px; }
-  .suggestion-card p  { font-size:12px; color:var(--muted); line-height:1.6; }
+/* S2 */
+.teams-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;}
+.team-card{padding:24px 18px;border-radius:14px;cursor:pointer;transition:all 0.25s;text-align:center;}
+.team-card:hover{transform:translateY(-4px) scale(1.02);border-color:var(--tc) !important;}
+.team-card:hover .tc-glow{opacity:0.5;}
+.tc-glow{position:absolute;top:-20px;left:50%;transform:translateX(-50%);width:80%;height:60px;background:var(--tc);filter:blur(20px);opacity:0.25;pointer-events:none;transition:opacity 0.25s;}
+.tc-bar{position:absolute;top:0;left:0;right:0;height:2px;background:var(--tc);border-radius:14px 14px 0 0;box-shadow:0 0 12px var(--tc);}
+.t-name{font-size:12px;font-weight:700;letter-spacing:0.5px;margin-bottom:14px;margin-top:4px;}
+.t-drivers{display:flex;flex-direction:column;gap:6px;}
+.t-driver{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:6px 10px;text-align:left;}
+.t-driver .dc{font-weight:900;font-size:13px;color:var(--tc);}
+.t-driver .dn{font-size:10px;color:var(--muted);}
 
-  /* ── NAV ── */
-  .nav { position:fixed; bottom:40px; left:50%; transform:translateX(-50%); display:flex; gap:8px; z-index:100; background:rgba(10,10,10,0.8); backdrop-filter:blur(12px); padding:8px; border-radius:50px; border:1px solid var(--border); }
-  .nav-dot { width:8px; height:8px; border-radius:50%; background:var(--border); cursor:pointer; transition:all 0.3s; border:none; }
-  .nav-dot.active { background:var(--accent); width:24px; border-radius:4px; }
+/* ── RACE SELECTOR ── */
+.race-selector-wrap{
+  padding:0 52px;flex-shrink:0;margin-bottom:16px;
+}
+.race-selector-label{
+  font-size:9px;letter-spacing:3px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:10px;
+}
+.race-chips-scroll{
+  display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;
+  scrollbar-width:none;
+}
+.race-chips-scroll::-webkit-scrollbar{display:none;}
+.race-chip{
+  flex-shrink:0;
+  padding:8px 16px;border-radius:50px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.07);
+  font-size:11px;color:var(--muted);
+  cursor:pointer;transition:all 0.2s;
+  white-space:nowrap;
+}
+.race-chip:hover{background:rgba(255,255,255,0.07);color:var(--text);}
+.race-chip.active{
+  background:var(--rc-bg,rgba(225,6,0,0.15));
+  border-color:var(--rc,var(--accent));
+  color:var(--text);font-weight:700;
+  box-shadow:0 0 12px var(--rc-glow,rgba(225,6,0,0.3));
+}
 
-  /* ── BACK BTN ── */
-  .back-btn { display:flex; align-items:center; gap:8px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:13px; transition:color 0.2s; padding:0; }
-  .back-btn:hover { color:var(--text); }
-  .team-badge { display:inline-flex; align-items:center; gap:10px; padding:6px 14px; border-radius:4px; font-size:12px; font-weight:700; letter-spacing:1px; }
+/* S3 */
+.pred-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;}
+.driver-card{padding:28px;}
+.dc-glow{position:absolute;top:-30px;right:-30px;width:150px;height:150px;background:var(--tc);filter:blur(50px);opacity:0.12;pointer-events:none;}
+.d-code-bg{position:absolute;top:16px;right:20px;font-size:64px;font-weight:900;color:rgba(255,255,255,0.04);letter-spacing:-3px;line-height:1;pointer-events:none;}
+.d-name{font-size:22px;font-weight:800;letter-spacing:-0.5px;margin-bottom:2px;}
+.d-team-label{font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:20px;}
+.metrics-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;}
+.metric{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;}
+.metric-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.metric-value{font-size:20px;font-weight:800;}
+.metric-value.sm{font-size:15px;}
+.good{color:#22c55e;}.warn{color:#f59e0b;}.bad{color:#ef4444;}
+.pos-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:4px;font-size:12px;font-weight:800;background:rgba(255,255,255,0.06);}
+.pos-badge.p1{background:#f59e0b;color:#000;}.pos-badge.p2{background:#9ca3af;color:#000;}.pos-badge.p3{background:#cd7f32;color:#000;}
 
-  /* ── LOADING ── */
-  .loading { display:flex; align-items:center; justify-content:center; height:200px; color:var(--muted); font-size:13px; letter-spacing:2px; }
-  .spinner { width:20px; height:20px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; margin-right:12px; }
-  @keyframes spin { to { transform:rotate(360deg); } }
+/* Circuit info strip */
+.circuit-strip{
+  display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;
+}
+.circuit-pill{
+  padding:8px 16px;border-radius:50px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.07);
+  font-size:11px;color:var(--muted);
+  display:flex;align-items:center;gap:6px;
+}
+.circuit-pill b{color:var(--text);}
+.circuit-note{
+  width:100%;padding:12px 18px;border-radius:10px;
+  background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.15);
+  font-size:11px;color:rgba(255,165,0,0.8);
+}
 
-  /* scrollbar */
-  ::-webkit-scrollbar { width:4px; }
-  ::-webkit-scrollbar-track { background:transparent; }
-  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+/* Race grid table */
+.race-grid-card{padding:20px;margin-bottom:18px;}
+.race-grid-title{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+.race-grid-table{width:100%;border-collapse:collapse;font-size:12px;}
+.race-grid-table th{padding:6px 10px;color:var(--muted);font-size:9px;letter-spacing:2px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,0.06);}
+.race-grid-table td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,0.03);}
+.race-grid-table tr.selected-row td{background:rgba(255,255,255,0.03);}
+.race-grid-table tr:hover td{background:rgba(255,255,255,0.02);}
+
+/* Teammate */
+.teammate-card{padding:24px;margin-bottom:18px;}
+.teammate-title{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
+
+/* Season section */
+.season-divider{
+  display:flex;align-items:center;gap:16px;
+  font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);
+  margin:4px 0 16px;
+}
+.season-divider::before,.season-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.06);}
+.season-chart-card{padding:24px;margin-bottom:18px;}
+.chart-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;}
+.chart-title span{font-size:9px;color:rgba(255,255,255,0.2);}
+.chart-wrap{position:relative;height:220px;}
+.chart-wrap-tall{position:relative;height:260px;}
+.radar-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;}
+.radar-card{padding:24px;}
+
+/* S4 */
+.analysis-2col{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;}
+.chart-card{padding:24px;}
+.section-title{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:12px;}
+.section-title::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.06);}
+.inaccuracy-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+.inaccuracy-card{padding:20px;}
+.inac-icon{font-size:24px;margin-bottom:12px;}
+.inac-title{font-size:13px;font-weight:700;margin-bottom:8px;}
+.inac-detail{font-size:11px;color:var(--muted);line-height:1.6;}
+.suggestions-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+.suggestion-card{padding:20px;}
+.priority-badge{font-size:9px;letter-spacing:2px;text-transform:uppercase;font-weight:800;margin-bottom:10px;display:inline-flex;align-items:center;gap:6px;}
+.priority-badge::before{content:'';width:6px;height:6px;border-radius:50%;}
+.priority-badge.Critical{color:#ef4444;}.priority-badge.Critical::before{background:#ef4444;box-shadow:0 0 6px #ef4444;}
+.priority-badge.High{color:#f59e0b;}.priority-badge.High::before{background:#f59e0b;box-shadow:0 0 6px #f59e0b;}
+.priority-badge.Medium{color:#3b82f6;}.priority-badge.Medium::before{background:#3b82f6;box-shadow:0 0 6px #3b82f6;}
+.priority-badge.Low{color:#6b7280;}.priority-badge.Low::before{background:#6b7280;}
+.sug-area{font-size:14px;font-weight:700;margin-bottom:8px;}
+.sug-detail{font-size:11px;color:var(--muted);line-height:1.6;}
+.worst-races-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;}
+.worst-race-card{padding:16px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:10px;}
+.wr-race{font-size:12px;font-weight:700;margin-bottom:4px;}
+.wr-error{font-size:20px;font-weight:900;color:#ef4444;margin-bottom:4px;}
+.wr-note{font-size:10px;color:var(--muted);line-height:1.5;}
+.conf-bar-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.conf-bar-label{font-size:11px;width:110px;flex-shrink:0;color:var(--muted);}
+.conf-bar-track{flex:1;height:6px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;}
+.conf-bar-fill{height:100%;border-radius:3px;transition:width 0.8s ease;}
+.conf-bar-val{font-size:11px;font-weight:700;width:40px;text-align:right;flex-shrink:0;}
+
+.nav{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:200;background:rgba(255,255,255,0.05);backdrop-filter:blur(20px);padding:8px 12px;border-radius:50px;border:1px solid rgba(255,255,255,0.08);}
+.nav-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.2);cursor:pointer;border:none;transition:all 0.3s;}
+.nav-dot.active{background:var(--accent);width:22px;border-radius:4px;box-shadow:0 0 8px var(--accent);}
+.loading{display:flex;align-items:center;justify-content:center;height:200px;color:var(--muted);font-size:11px;letter-spacing:3px;text-transform:uppercase;}
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,0.1);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin-right:12px;}
+@keyframes spin{to{transform:rotate(360deg);}}
 </style>
 </head>
 <body>
+<div class="bg-canvas"></div>
+<div class="bg-grid"></div>
 
-<!-- ══════════════════════════════════════════════
-     SCREEN 1 — WELCOME
-══════════════════════════════════════════════ -->
+<!-- S1 -->
 <div class="screen active above" id="s1">
-  <div class="badge">2025 Season · XGBoost + LightGBM Ensemble</div>
-  <h1>F1 Qualifying<br/><span>Predictor</span></h1>
-  <p>Machine learning model trained on 6 seasons of qualifying data. Predicts gap-to-pole using tyre strategy, weather, circuit DNA, and driver performance history.</p>
-  <div class="stats-row">
-    <div class="stat">
-      <div class="stat-num">0.28s</div>
-      <div class="stat-label">Mean Abs. Error</div>
-    </div>
-    <div class="stat">
-      <div class="stat-num">80.8%</div>
-      <div class="stat-label">Within 3 Positions</div>
-    </div>
-    <div class="stat">
-      <div class="stat-num">16,977</div>
-      <div class="stat-label">Training Laps</div>
-    </div>
-    <div class="stat">
-      <div class="stat-num">26</div>
-      <div class="stat-label">Features</div>
+  <div class="speed-lines" id="speedLines"></div>
+  <div class="s1-inner">
+    <div class="s1-eyebrow">Formula 1 · Machine Learning · 2025 Season</div>
+    <div class="s1-title"><div class="white">QUALIFYING</div><div class="red">PREDICTOR</div></div>
+    <p class="s1-sub">XGBoost + LightGBM ensemble trained on 16,977 laps across 6 seasons. Predicts gap-to-pole within 0.28 seconds on average.</p>
+    <div class="glass s1-glass-card">
+      <div class="s1-chips">
+        <div class="chip"><b>0.28s</b> avg error</div>
+        <div class="chip"><b>80.8%</b> within 3 positions</div>
+        <div class="chip"><b>26</b> features</div>
+        <div class="chip"><b>70%</b> better than baseline</div>
+      </div>
+      <button class="s1-btn" onclick="goTo(2)">SELECT A TEAM &nbsp;→</button>
     </div>
   </div>
-  <button class="btn" onclick="goTo(2)">Select a Team &nbsp;→</button>
 </div>
 
-<!-- ══════════════════════════════════════════════
-     SCREEN 2 — TEAM GRID
-══════════════════════════════════════════════ -->
+<!-- S2 -->
 <div class="screen below" id="s2">
-  <div class="screen-header">
-    <div>
-      <h2>Select a Constructor</h2>
-      <p>2025 Formula 1 World Championship</p>
-    </div>
+  <div class="s-header">
+    <div class="s-header-left"><h2>Select Constructor</h2><p>2025 Formula 1 World Championship · 10 Teams</p></div>
     <button class="back-btn" onclick="goTo(1)">← Back</button>
   </div>
-  <div class="teams-grid" id="teamsGrid">
-    <div class="loading"><div class="spinner"></div>Loading teams...</div>
+  <div class="screen-body">
+    <div class="teams-grid" id="teamsGrid"><div class="loading"><div class="spinner"></div>Loading...</div></div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════
-     SCREEN 3 — PREDICTION
-══════════════════════════════════════════════ -->
+<!-- S3 -->
 <div class="screen below" id="s3">
-  <div class="screen-header">
-    <div>
-      <h2 id="s3Title">Team Prediction</h2>
-      <p id="s3Sub">2025 Season Average · Gap to Pole Position</p>
-    </div>
-    <div style="display:flex;gap:12px;align-items:center;">
+  <div class="s-header">
+    <div class="s-header-left"><h2 id="s3Title">Team Prediction</h2><p id="s3Sub">Select a race below</p></div>
+    <div style="display:flex;gap:10px;align-items:center;">
       <button class="back-btn" onclick="goTo(2)">← Teams</button>
-      <button class="btn" onclick="goTo(4)" id="analyzeBtn">Analyse Grid →</button>
+      <button class="action-btn" onclick="goTo(4)">Analyse Grid →</button>
     </div>
   </div>
-  <div id="predContent"><div class="loading"><div class="spinner"></div>Loading predictions...</div></div>
+  <!-- Race selector -->
+  <div class="race-selector-wrap">
+    <div class="race-selector-label">2025 Season · Select Race</div>
+    <div class="race-chips-scroll" id="raceChips"></div>
+  </div>
+  <div class="screen-body" id="predContent">
+    <div class="loading"><div class="spinner"></div>Loading...</div>
+  </div>
 </div>
 
-<!-- ══════════════════════════════════════════════
-     SCREEN 4 — ANALYSIS
-══════════════════════════════════════════════ -->
+<!-- S4 -->
 <div class="screen below" id="s4">
-  <div class="screen-header">
-    <div>
-      <h2>Grid Analysis & R&D Insights</h2>
-      <p id="s4Sub">Season average comparison · All constructors</p>
-    </div>
+  <div class="s-header">
+    <div class="s-header-left"><h2>Grid Analysis & R&D Insights</h2><p id="s4Sub">Season average · All constructors</p></div>
     <button class="back-btn" onclick="goTo(3)">← Prediction</button>
   </div>
-  <div id="analysisContent"><div class="loading"><div class="spinner"></div>Loading analysis...</div></div>
+  <div class="screen-body" id="analysisContent"><div class="loading"><div class="spinner"></div>Loading analysis...</div></div>
 </div>
 
-<!-- ── NAV DOTS ── -->
 <nav class="nav">
   <button class="nav-dot active" onclick="goTo(1)"></button>
   <button class="nav-dot" onclick="goTo(2)"></button>
@@ -202,245 +273,430 @@
 <script>
 let currentScreen = 1;
 let selectedTeam  = null;
+let selectedRace  = null;
+let teamColor     = '#e10600';
+let seasonCache   = null;
 let charts        = {};
 
-function goTo(n) {
-  const prev = document.getElementById(`s${currentScreen}`);
-  const next = document.getElementById(`s${n}`);
+const RACE_ORDER = [
+  "Australian Grand Prix","Chinese Grand Prix","Japanese Grand Prix",
+  "Bahrain Grand Prix","Saudi Arabian Grand Prix","Miami Grand Prix",
+  "Emilia Romagna Grand Prix","Monaco Grand Prix","Canadian Grand Prix",
+  "Spanish Grand Prix","Austrian Grand Prix","British Grand Prix",
+  "Belgian Grand Prix","Hungarian Grand Prix","Dutch Grand Prix",
+  "Italian Grand Prix","Azerbaijan Grand Prix","Singapore Grand Prix",
+  "United States Grand Prix","Mexico City Grand Prix","São Paulo Grand Prix",
+  "Las Vegas Grand Prix","Qatar Grand Prix","Abu Dhabi Grand Prix",
+];
+
+// Speed lines
+(function(){
+  const c=document.getElementById('speedLines');
+  [{top:'15%',w:'35vw',d:0,dur:2.8},{top:'28%',w:'55vw',d:0.4,dur:3.2},
+   {top:'42%',w:'45vw',d:0.8,dur:2.5},{top:'55%',w:'60vw',d:1.2,dur:3.5},
+   {top:'68%',w:'30vw',d:0.2,dur:2.9},{top:'78%',w:'50vw',d:1.6,dur:3.1},
+   {top:'88%',w:'40vw',d:0.6,dur:2.7}].forEach(l=>{
+    const el=document.createElement('div');
+    el.className='speed-line';
+    el.style.cssText=`top:${l.top};width:${l.w};animation-delay:${l.d}s;animation-duration:${l.dur}s;`;
+    c.appendChild(el);
+  });
+})();
+
+function goTo(n){
+  const prev=document.getElementById(`s${currentScreen}`);
+  const next=document.getElementById(`s${n}`);
   prev.classList.remove('active');
-  prev.classList.add(n > currentScreen ? 'above' : 'below');
+  prev.classList.add(n>currentScreen?'above':'below');
   next.classList.remove('above','below');
   next.classList.add('active');
-  document.querySelectorAll('.nav-dot').forEach((d,i) => d.classList.toggle('active', i===n-1));
-  currentScreen = n;
+  document.querySelectorAll('.nav-dot').forEach((d,i)=>d.classList.toggle('active',i===n-1));
+  currentScreen=n;
+  if(n===4) loadAnalysis();
 }
 
-// ── SCREEN 2: Load teams ──────────────────────────────────────
-async function loadTeams() {
-  const res   = await fetch('/api/teams');
-  const teams = await res.json();
-  const grid  = document.getElementById('teamsGrid');
-  grid.innerHTML = teams.map(t => `
-    <div class="team-card" style="--team-color:${t.color}" onclick="selectTeam('${t.name}')">
-      <div class="team-name">${t.name}</div>
-      <div class="team-drivers">
-        ${t.drivers.map(d => `
-          <div class="driver-pill">
-            <span class="driver-code">${d.code}</span>
-            <span>${d.name}</span>
-          </div>
-        `).join('')}
-      </div>
+// S2
+async function loadTeams(){
+  const res=await fetch('/api/teams');
+  const teams=await res.json();
+  document.getElementById('teamsGrid').innerHTML=teams.map(t=>`
+    <div class="glass team-card" style="--tc:${t.color}" onclick="selectTeam('${t.name}','${t.color}')">
+      <div class="tc-glow"></div><div class="tc-bar"></div>
+      <div class="t-name">${t.name}</div>
+      <div class="t-drivers">${t.drivers.map(d=>`
+        <div class="t-driver"><span class="dc">${d.code}</span><span class="dn">${d.name}</span></div>
+      `).join('')}</div>
     </div>
   `).join('');
 }
 
-// ── SCREEN 3: Load prediction ────────────────────────────────
-async function selectTeam(team) {
+// S3 — select team
+async function selectTeam(team, color){
   selectedTeam = team;
+  teamColor    = color;
+  seasonCache  = null;
   goTo(3);
-  document.getElementById('s3Title').textContent = team;
-  document.getElementById('predContent').innerHTML = '<div class="loading"><div class="spinner"></div>Loading predictions...</div>';
 
-  const res  = await fetch(`/api/team/${team.replace(/ /g,'-')}`);
-  const data = await res.json();
-  renderPrediction(data);
+  document.getElementById('s3Title').textContent = team;
+  document.getElementById('predContent').innerHTML='<div class="loading"><div class="spinner"></div>Loading...</div>';
+
+  // Build race chips
+  const chipsEl = document.getElementById('raceChips');
+  chipsEl.innerHTML = RACE_ORDER.map((r,i)=>`
+    <div class="race-chip" id="chip_${i}"
+      style="--rc:${color};--rc-bg:${color}22;--rc-glow:${color}44"
+      onclick="selectRace('${r}',${i})">
+      ${r.replace(' Grand Prix','')}
+    </div>
+  `).join('');
+
+  // Load season data in background
+  fetch(`/api/season/${team.replace(/ /g,'-')}`).then(r=>r.json()).then(d=>{seasonCache=d;});
+
+  // Default to first race
+  selectRace(RACE_ORDER[0], 0);
 }
 
-function fmt(v) { return v >= 0 ? `+${v.toFixed(3)}s` : `${v.toFixed(3)}s`; }
-function errClass(e) { return e < 0.2 ? 'good' : e < 0.5 ? 'warn' : 'bad'; }
-function posClass(p) { return p===1?'p1':p===2?'p2':p===3?'p3':''; }
+// S3 — select race
+async function selectRace(race, idx){
+  selectedRace = race;
 
-function renderPrediction(data) {
+  // Update chips
+  document.querySelectorAll('.race-chip').forEach((c,i)=>c.classList.toggle('active',i===idx));
+
+  // Scroll active chip into view
+  const chip = document.getElementById(`chip_${idx}`);
+  if(chip) chip.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+
+  document.getElementById('s3Sub').textContent = race;
+  document.getElementById('predContent').innerHTML='<div class="loading"><div class="spinner"></div>Loading race data...</div>';
+
+  const res  = await fetch(`/api/race/${selectedTeam.replace(/ /g,'-')}/${race.replace(/ /g,'-')}`);
+  const data = await res.json();
+  renderRace(data);
+}
+
+function fmt(v){return v>=0?`+${v.toFixed(3)}s`:`${v.toFixed(3)}s`;}
+function fmtTime(s){if(!s)return'—';const m=Math.floor(s/60);const sec=(s%60).toFixed(3);return`${m}:${sec.padStart(6,'0')}`;}
+function errClass(e){return e<0.2?'good':e<0.5?'warn':'bad';}
+function posClass(p){return p===1?'p1':p===2?'p2':p===3?'p3':'';}
+
+function renderRace(data){
   const color = data.color;
-  const html  = `
+  const c     = data.circuit;
+  const tm    = data.teammate;
+
+  // Circuit info strip
+  const circuitHTML = c ? `
+    <div class="circuit-strip">
+      <div class="circuit-pill">🏟️ <b>${c.name}</b></div>
+      <div class="circuit-pill">🌍 <b>${c.country}</b></div>
+      <div class="circuit-pill">${c.type==='Street'?'🏙️':'🏁'} <b>${c.type} Circuit</b></div>
+      <div class="circuit-pill">📏 <b>${(c.length/1000).toFixed(3)} km</b></div>
+      <div class="circuit-pill">↩️ <b>${c.corners} corners</b></div>
+      <div class="circuit-pill">💨 <b>${c.drs} DRS zones</b></div>
+      <div class="circuit-pill">⚡ <b>${c.speed_class} speed</b></div>
+      <div class="circuit-pill">⛰️ <b>${c.altitude}m altitude</b></div>
+      ${data.note?`<div class="circuit-note">ℹ️ ${data.note}</div>`:''}
+    </div>
+  ` : '';
+
+  // Driver cards
+  const driverCardsHTML = `
     <div class="pred-grid">
-      ${data.drivers.map(d => `
-        <div class="driver-card" style="--team-color:${color}">
-          <div class="d-code">${d.code}</div>
+      ${data.drivers.map(d=>`
+        <div class="glass driver-card" style="--tc:${color}">
+          <div class="dc-glow"></div>
+          <div class="d-code-bg">${d.code}</div>
           <div class="d-name">${d.name}</div>
-          <div class="d-team" style="color:${color}">${data.team}</div>
+          <div class="d-team-label" style="color:${color}">${data.team} · ${data.race.replace(' Grand Prix','')}</div>
           <div class="metrics-row">
             <div class="metric">
               <div class="metric-label">Predicted Gap</div>
-              <div class="metric-value">${fmt(d.avg_predicted)}</div>
+              <div class="metric-value">${fmt(d.predicted)}</div>
             </div>
             <div class="metric">
               <div class="metric-label">Actual Gap</div>
-              <div class="metric-value">${fmt(d.avg_actual)}</div>
+              <div class="metric-value">${fmt(d.actual)}</div>
             </div>
             <div class="metric">
               <div class="metric-label">Model Error</div>
-              <div class="metric-value ${errClass(d.avg_error)}">${d.avg_error.toFixed(3)}s</div>
+              <div class="metric-value ${errClass(d.error)}">${d.error.toFixed(3)}s</div>
             </div>
           </div>
           <div class="metrics-row">
             <div class="metric">
-              <div class="metric-label">Pred. Position</div>
-              <div class="metric-value">P${Math.round(d.avg_pred_pos)}</div>
+              <div class="metric-label">Predicted Lap</div>
+              <div class="metric-value sm">${fmtTime(d.pred_time)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Actual Lap</div>
+              <div class="metric-value sm">${fmtTime(d.actual_time||d.pole_time+d.actual)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Pole Time</div>
+              <div class="metric-value sm">${fmtTime(d.pole_time)}</div>
+            </div>
+          </div>
+          <div class="metrics-row">
+            <div class="metric">
+              <div class="metric-label">Predicted Position</div>
+              <div class="metric-value" style="display:flex;align-items:center;gap:8px;">
+                <span class="pos-badge ${posClass(d.pred_pos)}">${d.pred_pos}</span>
+              </div>
             </div>
             <div class="metric">
               <div class="metric-label">Actual Position</div>
-              <div class="metric-value">P${Math.round(d.avg_actual_pos)}</div>
+              <div class="metric-value" style="display:flex;align-items:center;gap:8px;">
+                <span class="pos-badge ${posClass(d.actual_pos)}">${d.actual_pos}</span>
+              </div>
             </div>
             <div class="metric">
-              <div class="metric-label">Races Analysed</div>
-              <div class="metric-value">${d.races.length}</div>
+              <div class="metric-label">Position Delta</div>
+              <div class="metric-value ${Math.abs(d.pred_pos-d.actual_pos)<=2?'good':Math.abs(d.pred_pos-d.actual_pos)<=4?'warn':'bad'}">
+                ${d.pred_pos===d.actual_pos?'✓ Exact':`${Math.abs(d.pred_pos-d.actual_pos)} off`}
+              </div>
             </div>
           </div>
-          <table class="race-table">
-            <thead>
-              <tr>
-                <th>Race</th>
-                <th>Predicted</th>
-                <th>Actual</th>
-                <th>Error</th>
-                <th>Pred P</th>
-                <th>Real P</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${d.races.map(r => `
-                <tr>
-                  <td style="color:var(--muted)">${r.race.replace(' Grand Prix','')}</td>
-                  <td>${fmt(r.predicted)}</td>
-                  <td>${fmt(r.actual)}</td>
-                  <td style="color:${r.error<0.2?'#22c55e':r.error<0.5?'#f59e0b':'#ef4444'}">${r.error.toFixed(3)}s</td>
-                  <td><span class="pos-badge ${posClass(r.pred_pos)}">${r.pred_pos}</span></td>
-                  <td><span class="pos-badge ${posClass(r.actual_pos)}">${r.actual_pos}</span></td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
         </div>
       `).join('')}
     </div>
   `;
-  document.getElementById('predContent').innerHTML = html;
-}
 
-// ── SCREEN 4: Analysis ────────────────────────────────────────
-async function loadAnalysis() {
-  if (!selectedTeam) return;
-  document.getElementById('s4Sub').textContent = `${selectedTeam} · Season average comparison`;
-  document.getElementById('analysisContent').innerHTML = '<div class="loading"><div class="spinner"></div>Loading analysis...</div>';
-
-  const res  = await fetch(`/api/grid/${selectedTeam.replace(/ /g,'-')}`);
-  const data = await res.json();
-  renderAnalysis(data);
-}
-
-function renderAnalysis(data) {
-  const html = `
-    <div class="analysis-grid">
-      <div class="chart-card">
-        <h3>Predicted vs Actual Gap to Pole — All Drivers</h3>
-        <div class="chart-wrap"><canvas id="gridChart"></canvas></div>
+  // Teammate comparison for this race
+  let tmHTML = '';
+  if(tm){
+    const maxG = Math.max(tm.d1_gap, tm.d2_gap, 0.01);
+    tmHTML = `
+      <div class="glass teammate-card">
+        <div class="teammate-title">Teammate Head-to-Head · ${data.race.replace(' Grand Prix','')}</div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:24px;margin-bottom:20px;">
+          <div style="text-align:center;">
+            <div style="font-size:28px;font-weight:900;color:${color}">${tm.d1_code}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">${tm.d1_name}</div>
+            <div style="font-size:18px;font-weight:800;margin-top:8px;">${fmt(tm.d1_gap)}</div>
+          </div>
+          <div style="text-align:center;padding:0 16px;">
+            <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Delta</div>
+            <div style="font-size:28px;font-weight:900;color:${color};text-shadow:0 0 20px ${color}66">${tm.delta.toFixed(3)}s</div>
+            <div style="font-size:11px;color:#22c55e;margin-top:6px;">${tm.faster} faster this race</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:28px;font-weight:900;color:${color}88">${tm.d2_code}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">${tm.d2_name}</div>
+            <div style="font-size:18px;font-weight:800;margin-top:8px;">${fmt(tm.d2_gap)}</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">${tm.d1_code} gap to pole</div>
+            <div style="height:6px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;">
+              <div style="height:100%;width:${(tm.d1_gap/maxG*100).toFixed(1)}%;background:${color};border-radius:3px;box-shadow:0 0 8px ${color}66;"></div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">${tm.d2_code} gap to pole</div>
+            <div style="height:6px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;">
+              <div style="height:100%;width:${(tm.d2_gap/maxG*100).toFixed(1)}%;background:${color}88;border-radius:3px;"></div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="chart-card">
-        <h3>Constructor Average Gap to Pole</h3>
-        <div class="chart-wrap"><canvas id="teamChart"></canvas></div>
+    `;
+  }
+
+  // Full race grid
+  const gridHTML = `
+    <div class="glass race-grid-card">
+      <div class="race-grid-title">Full Grid · ${data.race} — Predicted vs Actual</div>
+      <table class="race-grid-table">
+        <thead>
+          <tr>
+            <th>Pos</th><th>Driver</th><th>Team</th>
+            <th>Predicted Gap</th><th>Actual Gap</th><th>Error</th><th>P↓</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.full_grid.map(d=>`
+            <tr class="${d.is_selected?'selected-row':''}">
+              <td><span class="pos-badge ${posClass(d.actual_pos)}">${d.actual_pos}</span></td>
+              <td style="font-weight:${d.is_selected?'800':'400'};color:${d.is_selected?d.color:'var(--text)'}">
+                ${d.driver}${d.is_selected?' ●':''}
+              </td>
+              <td style="font-size:11px;color:var(--muted)">${d.team}</td>
+              <td>${fmt(d.predicted)}</td>
+              <td style="font-weight:600">${fmt(d.actual)}</td>
+              <td style="color:${d.error<0.2?'#22c55e':d.error<0.5?'#f59e0b':'#ef4444'}">${d.error.toFixed(3)}s</td>
+              <td><span class="pos-badge ${posClass(d.pred_pos)}">${d.pred_pos}</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  // Season section
+  const seasonHTML = `
+    <div class="season-divider">Season Overview — All 24 Races</div>
+    <div class="glass season-chart-card">
+      <div class="chart-title">
+        Predicted vs Actual Gap to Pole — 2025 Season Race by Race
+        <span>Hover for race details</span>
+      </div>
+      <div class="chart-wrap-tall"><canvas id="seasonChart"></canvas></div>
+    </div>
+    <div class="radar-grid">
+      <div class="glass radar-card">
+        <div class="chart-title">Driver 1 · Performance Profile by Circuit Type</div>
+        <div class="chart-wrap"><canvas id="radar_d1"></canvas></div>
+      </div>
+      <div class="glass radar-card">
+        <div class="chart-title">Driver 2 · Performance Profile by Circuit Type</div>
+        <div class="chart-wrap"><canvas id="radar_d2"></canvas></div>
       </div>
     </div>
+  `;
+
+  document.getElementById('predContent').innerHTML =
+    circuitHTML + driverCardsHTML + tmHTML + gridHTML + seasonHTML;
+
+  // Destroy old s3 charts
+  ['seasonChart','radar_d1','radar_d2'].forEach(id=>{
+    if(charts[id]){charts[id].destroy();delete charts[id];}
+  });
+
+  // Draw season charts if cache ready, else wait
+  function drawSeasonCharts(){
+    if(!seasonCache) return;
+    const sd = seasonCache;
+
+    const sCtx=document.getElementById('seasonChart');
+    if(sCtx && sd.season_lines.length>0){
+      const labels=sd.season_lines[0].labels;
+      const datasets=[];
+      sd.season_lines.forEach((dl,i)=>{
+        const c=i===0?teamColor:teamColor+'88';
+        datasets.push({label:`${dl.driver} Actual`,data:dl.actual.map(p=>p.val),borderColor:c,backgroundColor:'transparent',pointBackgroundColor:c,pointRadius:4,borderWidth:2,tension:0.3});
+        datasets.push({label:`${dl.driver} Predicted`,data:dl.predicted.map(p=>p.val),borderColor:c+'66',backgroundColor:'transparent',pointRadius:3,borderWidth:1,borderDash:[4,4],tension:0.3});
+      });
+      charts['seasonChart']=new Chart(sCtx,{
+        type:'line',data:{labels,datasets},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'rgba(255,255,255,0.4)',font:{size:10}}},tooltip:{backgroundColor:'rgba(10,10,12,0.95)',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,callbacks:{label:ctx=>`${ctx.dataset.label}: +${ctx.parsed.y.toFixed(3)}s`}}},scales:{x:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:10},callback:v=>`+${v.toFixed(2)}s`},grid:{color:'rgba(255,255,255,0.04)'}}}}
+      });
+    }
+
+    ['d1','d2'].forEach((key,i)=>{
+      const r=sd.radar[i];
+      if(!r) return;
+      const ctx=document.getElementById(`radar_${key}`);
+      if(!ctx) return;
+      const archs=sd.archetypes;
+      document.querySelector(`#radar_${key}`).closest('.radar-card').querySelector('.chart-title').textContent=`${r.name} · Performance Profile by Circuit Type`;
+      charts[`radar_${key}`]=new Chart(ctx,{
+        type:'radar',
+        data:{labels:archs.map(a=>a.replace('-',' ')),datasets:[{label:r.name,data:archs.map(a=>r.scores[a]??0),borderColor:teamColor,backgroundColor:teamColor+'22',pointBackgroundColor:teamColor,pointRadius:4,borderWidth:2}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{r:{ticks:{display:false},grid:{color:'rgba(255,255,255,0.08)'},pointLabels:{color:'rgba(255,255,255,0.5)',font:{size:9}},suggestedMin:0,suggestedMax:100}}}
+      });
+    });
+  }
+
+  if(seasonCache){
+    drawSeasonCharts();
+  } else {
+    const poll=setInterval(()=>{if(seasonCache){clearInterval(poll);drawSeasonCharts();}},200);
+  }
+}
+
+// S4
+async function loadAnalysis(){
+  if(!selectedTeam) return;
+  document.getElementById('s4Sub').textContent=`${selectedTeam} · Season average · All constructors`;
+  document.getElementById('analysisContent').innerHTML='<div class="loading"><div class="spinner"></div>Loading analysis...</div>';
+  const [gridRes,scatterRes,confRes]=await Promise.all([
+    fetch(`/api/grid/${selectedTeam.replace(/ /g,'-')}`),
+    fetch(`/api/scatter/${selectedTeam.replace(/ /g,'-')}`),
+    fetch(`/api/confidence/${selectedTeam.replace(/ /g,'-')}`)
+  ]);
+  const gridData=await gridRes.json();
+  const scatterData=await scatterRes.json();
+  const confData=await confRes.json();
+  renderAnalysis(gridData,scatterData,confData);
+}
+
+function renderAnalysis(data,scatterData,confData){
+  const color=data.selected_color;
+  document.getElementById('analysisContent').innerHTML=`
+    <div class="section-title">Grid Comparison · 2025 Full Season Average</div>
+    <div class="analysis-2col">
+      <div class="glass chart-card">
+        <div class="chart-title">Predicted vs Actual Gap to Pole — All Drivers · Season Average<span>Bars = actual · Line = predicted</span></div>
+        <div class="chart-wrap-tall"><canvas id="gridChart"></canvas></div>
+      </div>
+      <div class="glass chart-card">
+        <div class="chart-title">Constructor Average Gap to Pole — 2025 Season<span>Bars = actual · Line = predicted</span></div>
+        <div class="chart-wrap-tall"><canvas id="teamChart"></canvas></div>
+      </div>
+    </div>
+    <div class="section-title">Position Accuracy · Full 2025 Season — All Races</div>
+    <div class="analysis-2col">
+      <div class="glass chart-card">
+        <div class="chart-title">Predicted vs Actual Qualifying Position — Full 2025 Season (All Races)<span>Each dot = 1 driver × 1 race · Diagonal = perfect prediction</span></div>
+        <div class="chart-wrap-tall"><canvas id="scatterChart"></canvas></div>
+      </div>
+      <div class="glass chart-card">
+        <div class="chart-title">Model Confidence by Constructor · Based on Season-Average Prediction Error<span>Higher = more reliable predictions for this team</span></div>
+        <div style="padding-top:8px;" id="teamConfBars"></div>
+      </div>
+    </div>
+    <div class="section-title">Model Confidence by Circuit · 2025 Season</div>
+    <div class="glass chart-card" style="margin-bottom:18px;">
+      <div class="chart-title">Model Confidence by Circuit — 2025 Season (All 24 Races)<span style="display:flex;gap:16px;"><span style="color:#6692FF">● Street</span><span style="color:#22c55e">● Permanent</span></span></div>
+      <div class="chart-wrap-tall"><canvas id="circuitConfChart"></canvas></div>
+    </div>
+    <div class="section-title">Why Predictions Miss — Margin of Error Analysis</div>
+    <div class="inaccuracy-grid">
+      ${data.inaccuracy_reasons.map(r=>`
+        <div class="glass inaccuracy-card"><div class="inac-icon">${r.icon}</div><div class="inac-title">${r.title}</div><div class="inac-detail">${r.detail}</div></div>
+      `).join('')}
+    </div>
+    <div class="section-title">Highest Error Races · Where the Model Struggled Most</div>
+    <div class="worst-races-grid">
+      ${data.worst_races.map(r=>`
+        <div class="worst-race-card"><div class="wr-race">${r.race.replace(' Grand Prix','')}</div><div class="wr-error">${r.Error.toFixed(3)}s avg error</div><div class="wr-note">${r.note||'Complex conditions'}</div></div>
+      `).join('')}
+    </div>
+    <div class="section-title">Suggestions for Improvement</div>
     <div class="suggestions-grid">
-      ${data.suggestions.map(s => `
-        <div class="suggestion-card">
-          <div class="priority ${s.priority}">${s.priority}</div>
-          <h4>${s.area}</h4>
-          <p>${s.detail}</p>
-        </div>
+      ${data.suggestions.map(s=>`
+        <div class="glass suggestion-card"><div class="priority-badge ${s.priority}">${s.priority}</div><div class="sug-area">${s.area}</div><div class="sug-detail">${s.detail}</div></div>
       `).join('')}
     </div>
   `;
-  document.getElementById('analysisContent').innerHTML = html;
 
-  // Destroy old charts
-  Object.values(charts).forEach(c => c.destroy());
-  charts = {};
+  ['gridChart','teamChart','scatterChart','circuitConfChart'].forEach(id=>{if(charts[id]){charts[id].destroy();delete charts[id];}});
 
-  // Chart 1: Driver bar chart
-  const sorted = [...data.grid].sort((a,b) => a.actual - b.actual);
-  charts.grid = new Chart(document.getElementById('gridChart'), {
-    type: 'bar',
-    data: {
-      labels: sorted.map(d => d.driver),
-      datasets: [
-        {
-          label: 'Actual',
-          data: sorted.map(d => d.actual),
-          backgroundColor: sorted.map(d => d.is_selected ? d.color : d.color + '55'),
-          borderColor: sorted.map(d => d.color),
-          borderWidth: sorted.map(d => d.is_selected ? 2 : 1),
-          borderRadius: 3,
-        },
-        {
-          label: 'Predicted',
-          data: sorted.map(d => d.predicted),
-          backgroundColor: 'transparent',
-          borderColor: sorted.map(d => d.color),
-          borderWidth: 1,
-          borderDash: [4,4],
-          type: 'line',
-          pointRadius: 3,
-          pointBackgroundColor: sorted.map(d => d.color),
-        }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { labels: { color:'#666', font:{size:11} } } },
-      scales: {
-        x: { ticks:{color:'#666',font:{size:10}}, grid:{color:'#1a1a1a'} },
-        y: { ticks:{color:'#666',font:{size:10},callback:v=>`+${v.toFixed(2)}s`}, grid:{color:'#1a1a1a'} }
-      }
-    }
-  });
+  const sorted=[...data.grid].sort((a,b)=>a.actual-b.actual);
+  charts.gridChart=new Chart(document.getElementById('gridChart'),{type:'bar',data:{labels:sorted.map(d=>d.driver),datasets:[{label:'Actual Gap',data:sorted.map(d=>d.actual),backgroundColor:sorted.map(d=>d.is_selected?d.color:d.color+'44'),borderColor:sorted.map(d=>d.color),borderWidth:sorted.map(d=>d.is_selected?2:0),borderRadius:4},{label:'Predicted Gap',data:sorted.map(d=>d.predicted),type:'line',borderColor:'rgba(255,255,255,0.25)',backgroundColor:'transparent',pointBackgroundColor:sorted.map(d=>d.color),pointRadius:4,borderWidth:1,borderDash:[4,4],tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'rgba(255,255,255,0.4)',font:{size:10}}},tooltip:{backgroundColor:'rgba(10,10,12,0.9)',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,callbacks:{label:ctx=>`${ctx.dataset.label}: +${ctx.parsed.y.toFixed(3)}s`}}},scales:{x:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:10},callback:v=>`+${v.toFixed(2)}s`},grid:{color:'rgba(255,255,255,0.04)'}}}}});
 
-  // Chart 2: Team bar chart
-  charts.team = new Chart(document.getElementById('teamChart'), {
-    type: 'bar',
-    data: {
-      labels: data.teams_chart.map(t => t.team.replace('Racing','').replace('Red Bull','RBR').trim()),
-      datasets: [
-        {
-          label: 'Actual',
-          data: data.teams_chart.map(t => t.actual),
-          backgroundColor: data.teams_chart.map(t => t.is_selected ? t.color : t.color+'55'),
-          borderColor: data.teams_chart.map(t => t.color),
-          borderWidth: data.teams_chart.map(t => t.is_selected ? 2 : 1),
-          borderRadius: 3,
-        },
-        {
-          label: 'Predicted',
-          data: data.teams_chart.map(t => t.predicted),
-          backgroundColor: 'transparent',
-          borderColor: data.teams_chart.map(t => t.color),
-          borderWidth: 1,
-          type: 'line',
-          pointRadius: 4,
-          pointBackgroundColor: data.teams_chart.map(t => t.color),
-        }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { labels: { color:'#666', font:{size:11} } } },
-      scales: {
-        x: { ticks:{color:'#666',font:{size:10},maxRotation:30}, grid:{color:'#1a1a1a'} },
-        y: { ticks:{color:'#666',font:{size:10},callback:v=>`+${v.toFixed(2)}s`}, grid:{color:'#1a1a1a'} }
-      }
-    }
-  });
+  charts.teamChart=new Chart(document.getElementById('teamChart'),{type:'bar',data:{labels:data.teams_chart.map(t=>t.team.replace('Red Bull Racing','Red Bull').replace('Racing Bulls','R. Bulls')),datasets:[{label:'Actual',data:data.teams_chart.map(t=>t.actual),backgroundColor:data.teams_chart.map(t=>t.is_selected?t.color:t.color+'44'),borderColor:data.teams_chart.map(t=>t.color),borderWidth:data.teams_chart.map(t=>t.is_selected?2:0),borderRadius:4},{label:'Predicted',data:data.teams_chart.map(t=>t.predicted),type:'line',borderColor:'rgba(255,255,255,0.25)',backgroundColor:'transparent',pointBackgroundColor:data.teams_chart.map(t=>t.color),pointRadius:5,borderWidth:1,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'rgba(255,255,255,0.4)',font:{size:10}}},tooltip:{backgroundColor:'rgba(10,10,12,0.9)',borderColor:'rgba(255,255,255,0.1)',borderWidth:1}},scales:{x:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:10},maxRotation:30},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:10},callback:v=>`+${v.toFixed(2)}s`},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+
+  const selPts=scatterData.points.filter(p=>p.is_selected);
+  const othPts=scatterData.points.filter(p=>!p.is_selected);
+  charts.scatterChart=new Chart(document.getElementById('scatterChart'),{type:'scatter',data:{datasets:[{label:'Other Teams',data:othPts.map(p=>({x:p.pred_pos,y:p.actual_pos,driver:p.driver,race:p.race})),backgroundColor:'rgba(255,255,255,0.08)',pointRadius:4,pointHoverRadius:6},{label:selectedTeam,data:selPts.map(p=>({x:p.pred_pos,y:p.actual_pos,driver:p.driver,race:p.race})),backgroundColor:color,pointRadius:6,pointHoverRadius:8},{label:'Perfect',data:[{x:1,y:1},{x:20,y:20}],type:'line',borderColor:'rgba(255,255,255,0.12)',backgroundColor:'transparent',pointRadius:0,borderWidth:1,borderDash:[6,6]}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'rgba(255,255,255,0.4)',font:{size:10},filter:i=>i.text!=='Perfect'}},tooltip:{backgroundColor:'rgba(10,10,12,0.9)',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,callbacks:{label:ctx=>{if(!ctx.raw.driver)return'';return[`${ctx.raw.driver} · ${ctx.raw.race.replace(' Grand Prix','')}`,`Pred: P${ctx.raw.x} · Actual: P${ctx.raw.y}`];}}}},scales:{x:{title:{display:true,text:'Predicted Position',color:'rgba(255,255,255,0.3)',font:{size:10}},ticks:{color:'rgba(255,255,255,0.4)',font:{size:10},stepSize:1},grid:{color:'rgba(255,255,255,0.04)'},min:1,max:21},y:{title:{display:true,text:'Actual Position',color:'rgba(255,255,255,0.3)',font:{size:10}},ticks:{color:'rgba(255,255,255,0.4)',font:{size:10},stepSize:1},grid:{color:'rgba(255,255,255,0.04)'},min:1,max:21}}}});
+
+  const tcEl=document.getElementById('teamConfBars');
+  if(tcEl) tcEl.innerHTML=confData.teams.map(t=>`
+    <div class="conf-bar-row">
+      <div class="conf-bar-label" style="color:${t.is_selected?t.color:'var(--muted)'};font-weight:${t.is_selected?700:400}">${t.team.replace('Red Bull Racing','Red Bull').replace('Racing Bulls','R. Bulls')}</div>
+      <div class="conf-bar-track"><div class="conf-bar-fill" style="width:${t.confidence}%;background:${t.color};box-shadow:${t.is_selected?`0 0 8px ${t.color}`:'none'};"></div></div>
+      <div class="conf-bar-val" style="color:${t.color}">${t.confidence.toFixed(0)}%</div>
+    </div>
+  `).join('');
+
+  const circSorted=[...confData.circuits].sort((a,b)=>b.confidence-a.confidence);
+  charts.circuitConfChart=new Chart(document.getElementById('circuitConfChart'),{type:'bar',data:{labels:circSorted.map(c=>c.race.replace(' Grand Prix','')),datasets:[{label:'Model Confidence %',data:circSorted.map(c=>c.confidence),backgroundColor:circSorted.map(c=>c.color+'99'),borderColor:circSorted.map(c=>c.color),borderWidth:1,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(10,10,12,0.9)',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,callbacks:{label:ctx=>{const c=circSorted[ctx.dataIndex];return[`Confidence: ${ctx.parsed.y.toFixed(1)}%`,`Avg error: ${c.Error.toFixed(3)}s`,c.note||''];}}}},scales:{x:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:10},callback:v=>`${v.toFixed(0)}%`},grid:{color:'rgba(255,255,255,0.04)'},min:0,max:100}}}});
 }
 
-// Override goTo to trigger data load
-const _goTo = goTo;
-goTo = function(n) {
-  _goTo(n);
-  if (n === 4) loadAnalysis();
-};
-
-// Init
 loadTeams();
 </script>
 </body>
